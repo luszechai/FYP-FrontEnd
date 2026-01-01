@@ -70,5 +70,10 @@ export const getHistory = async () => {
   return response.data
 }
 
+export const getSource = async (sourceId) => {
+  const response = await api.get(`/api/sources/${sourceId}`)
+  return response.data
+}
+
 export default api
 

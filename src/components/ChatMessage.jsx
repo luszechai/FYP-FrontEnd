@@ -2,6 +2,7 @@ import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Bot, User, Clock, FileText } from 'lucide-react'
+import SourceLink from './SourceLink'
 
 const ChatMessage = ({ message }) => {
   const isUser = message.role === 'user'
@@ -57,16 +58,24 @@ const ChatMessage = ({ message }) => {
         </div>
         
         {message.performance && (
-          <div className="mt-2 text-xs text-gray-500 flex items-center space-x-3">
+          <div className="mt-2 text-xs text-gray-500 flex items-center space-x-3 flex-wrap gap-2" style={{ zIndex: 1 }}>
             <span className="flex items-center space-x-1">
               <Clock className="w-3 h-3" />
               <span>{message.performance.total_time.toFixed(2)}s</span>
             </span>
             {message.sources && message.sources.length > 0 && (
-              <span className="flex items-center space-x-1">
-                <FileText className="w-3 h-3" />
-                <span>{message.sources.length} source(s)</span>
-              </span>
+              <div className="flex items-center space-x-2 flex-wrap gap-1" style={{ zIndex: 10, position: 'relative' }}>
+                <span className="flex items-center space-x-1">
+                  <FileText className="w-3 h-3" />
+                  <span>Sources:</span>
+                </span>
+                {message.sources.slice(0, 5).map((source, idx) => (
+                  <SourceLink key={`source-${idx}-${source.id || idx}`} source={source} index={idx + 1} />
+                ))}
+                {message.sources.length > 5 && (
+                  <span className="text-gray-400">+{message.sources.length - 5} more</span>
+                )}
+              </div>
             )}
           </div>
         )}

@@ -48,7 +48,8 @@ function App() {
         content: response.answer,
         timestamp: new Date(),
         performance: response.performance,
-        sources: response.sources
+        sources: response.sources || [],
+        enhanced_query: response.enhanced_query
       }
       setMessages(prev => [...prev, botMessage])
     } catch (error) {
