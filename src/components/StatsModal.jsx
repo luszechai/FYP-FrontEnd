@@ -1,21 +1,42 @@
 import React, { useState, useEffect } from 'react'
-import { X, BarChart3, Clock, Target, TrendingUp } from 'lucide-react'
-import { getStats } from '../services/api'
+import { X, BarChart3, Clock, Target, TrendingUp, Settings } from 'lucide-react'
+import { getStats, getEvaluationMethods } from '../services/api'
 
 const StatsModal = ({ isOpen, onClose }) => {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [evaluationMethod, setEvaluationMethod] = useState('max_similarity')
+  const [threshold, setThreshold] = useState(0.5)
+  const [evaluationMethods, setEvaluationMethods] = useState({})
+  const [showSettings, setShowSettings] = useState(false)
+
+  useEffect(() => {
+    if (isOpen) {
+      loadEvaluationMethods()
+      loadStats()
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (isOpen) {
       loadStats()
     }
-  }, [isOpen])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evaluationMethod, threshold])
+
+  const loadEvaluationMethods = async () => {
+    try {
+      const methods = await getEvaluationMethods()
+      setEvaluationMethods(methods)
+    } catch (error) {
+      console.error('Error loading evaluation methods:', error)
+    }
+  }
 
   const loadStats = async () => {
     try {
       setLoading(true)
-      const data = await getStats()
+      const data = await getStats(evaluationMethod, threshold)
       setStats(data)
     } catch (error) {
       console.error('Error loading stats:', error)
@@ -29,20 +50,85 @@ const StatsModal = ({ isOpen, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
           <div className="flex items-center space-x-3">
             <BarChart3 className="w-6 h-6 text-blue-600" />
             <h2 className="text-2xl font-bold text-gray-900">Session Statistics</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Evaluation Settings"
+            >
+              <Settings className="w-5 h-5 text-gray-500" />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
         </div>
 
         <div className="p-6">
+          {/* Evaluation Settings Panel */}
+          {showSettings && (
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Evaluation Method</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">
+                    Method
+                  </label>
+                  <select
+                    value={evaluationMethod}
+                    onChange={(e) => setEvaluationMethod(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {Object.entries(evaluationMethods).map(([key, description]) => (
+                      <option key={key} value={key}>
+                        {key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </option>
+                    ))}
+                  </select>
+                  {evaluationMethods[evaluationMethod] && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      {evaluationMethods[evaluationMethod]}
+                    </p>
+                  )}
+                </div>
+                {evaluationMethod !== 'strict' && evaluationMethod !== 'lenient' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">
+                      Similarity Threshold: {threshold}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={threshold}
+                      onChange={(e) => setThreshold(parseFloat(e.target.value))}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>0.0</span>
+                      <span>0.5</span>
+                      <span>1.0</span>
+                    </div>
+                  </div>
+                )}
+                {(evaluationMethod === 'strict' || evaluationMethod === 'lenient') && (
+                  <p className="text-xs text-gray-500 italic">
+                    Threshold is fixed for this method ({evaluationMethod === 'strict' ? '0.7' : '0.3'})
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>

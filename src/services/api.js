@@ -7,6 +7,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 300000, // 5 minutes timeout for longer responses
 })
 
 export const chat = async (query, useMemory = true) => {
@@ -60,8 +61,13 @@ export const clearMemory = async () => {
   return response.data
 }
 
-export const getStats = async () => {
-  const response = await api.get('/api/stats')
+export const getStats = async (hitRateMethod = 'max_similarity', hitRateThreshold = 0.5) => {
+  const response = await api.get('/api/stats', {
+    params: {
+      hit_rate_method: hitRateMethod,
+      hit_rate_threshold: hitRateThreshold
+    }
+  })
   return response.data
 }
 
@@ -72,6 +78,21 @@ export const getHistory = async () => {
 
 export const getSource = async (sourceId) => {
   const response = await api.get(`/api/sources/${sourceId}`)
+  return response.data
+}
+
+export const evaluate = async (hitRateMethod = 'max_similarity', hitRateThreshold = 0.5) => {
+  const response = await api.post('/api/evaluate', null, {
+    params: {
+      hit_rate_method: hitRateMethod,
+      hit_rate_threshold: hitRateThreshold
+    }
+  })
+  return response.data
+}
+
+export const getEvaluationMethods = async () => {
+  const response = await api.get('/api/evaluation/methods')
   return response.data
 }
 
