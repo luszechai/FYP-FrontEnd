@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Send, Trash2, BarChart3, History, Loader2, Bot, User } from 'lucide-react'
+import { Send, Trash2, BarChart3, History, Loader2, Bot, User, Paperclip, X, FileUp } from 'lucide-react'
 import ChatMessage from './components/ChatMessage'
 import StatsModal from './components/StatsModal'
 import HistoryModal from './components/HistoryModal'
-import { chat, clearMemory, getStats, getHistory } from './services/api'
+import { chat, clearMemory, getStats, getHistory, uploadFile, removeFile } from './services/api'
 
 function App() {
   const [messages, setMessages] = useState([])
@@ -11,8 +11,16 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState(null)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  const fileInputRef = useRef(null)
+
+  const ALLOWED_EXTENSIONS = '.pdf,.png,.jpg,.jpeg,.tiff,.bmp,.txt,.csv,.docx'
+  const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
+  const MAX_FILES = 5
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -22,6 +30,57 @@ function App() {
     scrollToBottom()
   }, [messages])
 
+  // Clear upload error after 5 seconds
+  useEffect(() => {
+    if (uploadError) {
+      const timer = setTimeout(() => setUploadError(null), 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [uploadError])
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    // Reset the input so the same file can be re-selected
+    e.target.value = ''
+
+    // Client-side validations
+    if (uploadedFiles.length >= MAX_FILES) {
+      setUploadError(`Maximum of ${MAX_FILES} files allowed. Remove a file first.`)
+      return
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      setUploadError(`File too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)} MB.`)
+      return
+    }
+
+    setUploading(true)
+    setUploadError(null)
+    try {
+      const result = await uploadFile(file)
+      setUploadedFiles(prev => [...prev, {
+        file_id: result.file_id,
+        filename: result.filename,
+        size: result.size,
+        text_length: result.text_length,
+      }])
+    } catch (error) {
+      const msg = error.response?.data?.detail || 'Failed to upload file. Please try again.'
+      setUploadError(msg)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleFileRemove = async (fileId) => {
+    try {
+      await removeFile(fileId)
+      setUploadedFiles(prev => prev.filter(f => f.file_id !== fileId))
+    } catch (error) {
+      console.error('Error removing file:', error)
+    }
+  }
+
   const handleSend = async (e) => {
     e.preventDefault()
     if (!input.trim() || loading) return
@@ -30,14 +89,16 @@ function App() {
     setInput('')
     setLoading(true)
 
-    // Add user message
+    // Add user message (include attached files for display)
     const newUserMessage = {
       id: Date.now(),
       role: 'user',
       content: userMessage,
-      timestamp: new Date()
+      timestamp: new Date(),
+      attachedFiles: uploadedFiles.length > 0 ? [...uploadedFiles] : undefined
     }
     setMessages(prev => [...prev, newUserMessage])
+    setUploadedFiles([])
 
     try {
       const response = await chat(userMessage)
@@ -73,6 +134,7 @@ function App() {
       try {
         await clearMemory()
         setMessages([])
+        setUploadedFiles([])
       } catch (error) {
         console.error('Error clearing memory:', error)
         alert('Failed to clear memory. Please try again.')
@@ -165,7 +227,63 @@ function App() {
       {/* Input */}
       <div className="bg-white border-t border-gray-200">
         <div className="max-w-4xl mx-auto px-4 py-4">
+          {/* Upload error toast */}
+          {uploadError && (
+            <div className="mb-2 px-3 py-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg flex items-center justify-between">
+              <span>{uploadError}</span>
+              <button onClick={() => setUploadError(null)} className="ml-2 text-red-400 hover:text-red-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Uploaded file badges */}
+          {uploadedFiles.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {uploadedFiles.map((file) => (
+                <div
+                  key={file.file_id}
+                  className="flex items-center space-x-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs px-2.5 py-1.5 rounded-full"
+                >
+                  <FileUp className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="max-w-[150px] truncate" title={file.filename}>{file.filename}</span>
+                  <button
+                    onClick={() => handleFileRemove(file.file_id)}
+                    className="text-blue-400 hover:text-red-500 transition-colors flex-shrink-0"
+                    title="Remove file"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <form onSubmit={handleSend} className="flex items-end space-x-3">
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ALLOWED_EXTENSIONS}
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+
+            {/* Paperclip button */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading || uploadedFiles.length >= MAX_FILES}
+              className="p-3 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title={uploadedFiles.length >= MAX_FILES ? `Maximum ${MAX_FILES} files` : 'Attach a file'}
+            >
+              {uploading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Paperclip className="w-5 h-5" />
+              )}
+            </button>
+
             <div className="flex-1">
               <textarea
                 ref={inputRef}

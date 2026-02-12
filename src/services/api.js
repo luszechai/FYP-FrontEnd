@@ -96,5 +96,27 @@ export const getEvaluationMethods = async () => {
   return response.data
 }
 
+export const uploadFile = async (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  const response = await api.post('/api/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 120000, // 2 minutes for large file processing
+  })
+  return response.data
+}
+
+export const removeFile = async (fileId) => {
+  const response = await api.delete(`/api/upload/${fileId}`)
+  return response.data
+}
+
+export const getUploadedFiles = async () => {
+  const response = await api.get('/api/upload')
+  return response.data
+}
+
 export default api
 

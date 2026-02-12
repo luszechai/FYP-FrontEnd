@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Bot, User, Clock, FileText } from 'lucide-react'
+import { Bot, User, Clock, FileText, FileUp } from 'lucide-react'
 import SourceLink from './SourceLink'
 
 const ChatMessage = ({ message }) => {
@@ -56,6 +56,21 @@ const ChatMessage = ({ message }) => {
             </ReactMarkdown>
           </div>
         </div>
+
+        {/* File attachment indicator for user messages */}
+        {isUser && message.attachedFiles && message.attachedFiles.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1.5 justify-end">
+            {message.attachedFiles.map((file) => (
+              <span
+                key={file.file_id}
+                className="inline-flex items-center space-x-1 bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full"
+              >
+                <FileUp className="w-3 h-3" />
+                <span className="max-w-[120px] truncate">{file.filename}</span>
+              </span>
+            ))}
+          </div>
+        )}
         
         {message.performance && (
           <div className="mt-2 text-xs text-gray-500 flex items-center space-x-3 flex-wrap gap-2" style={{ zIndex: 1 }}>
