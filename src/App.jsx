@@ -1,14 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Send, Trash2, BarChart3, History, Loader2, Bot, User, Paperclip, X, FileUp } from 'lucide-react'
 import ChatMessage from './components/ChatMessage'
 import StatsModal from './components/StatsModal'
 import HistoryModal from './components/HistoryModal'
-import { chat, clearMemory, getStats, getHistory, uploadFile, removeFile } from './services/api'
+import { chatStream, clearMemory, getStats, getHistory, uploadFile, removeFile } from './services/api'
 
 function App() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [streaming, setStreaming] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState([])
@@ -17,18 +18,25 @@ function App() {
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const fileInputRef = useRef(null)
+  const chunkBufferRef = useRef('')
+  const flushRafRef = useRef(null)
+  const scrollRafRef = useRef(null)
 
   const ALLOWED_EXTENSIONS = '.pdf,.png,.jpg,.jpeg,.tiff,.bmp,.txt,.csv,.docx'
   const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
   const MAX_FILES = 5
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
+  const scrollToBottom = useCallback(() => {
+    if (scrollRafRef.current) return
+    scrollRafRef.current = requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      scrollRafRef.current = null
+    })
+  }, [])
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages])
+  }, [messages, scrollToBottom])
 
   // Clear upload error after 5 seconds
   useEffect(() => {
@@ -100,31 +108,103 @@ function App() {
     setMessages(prev => [...prev, newUserMessage])
     setUploadedFiles([])
 
+    const botMessageId = Date.now() + 1
+
     try {
-      const response = await chat(userMessage)
-      
-      const botMessage = {
-        id: Date.now() + 1,
-        role: 'assistant',
-        content: response.answer,
-        timestamp: new Date(),
-        performance: response.performance,
-        sources: response.sources || [],
-        enhanced_query: response.enhanced_query
+      chunkBufferRef.current = ''
+
+      const flushBuffer = (msgId) => {
+        if (!chunkBufferRef.current) return
+        const text = chunkBufferRef.current
+        chunkBufferRef.current = ''
+        setMessages(prev =>
+          prev.map(msg =>
+            msg.id === msgId
+              ? { ...msg, content: msg.content + text }
+              : msg
+          )
+        )
       }
-      setMessages(prev => [...prev, botMessage])
+
+      await chatStream(userMessage, true, {
+        onMetadata: (data) => {
+          setStreaming(true)
+          const botMessage = {
+            id: botMessageId,
+            role: 'assistant',
+            content: '',
+            timestamp: new Date(),
+            sources: data.sources || [],
+            enhanced_query: data.enhanced_query || {},
+            isStreaming: true,
+          }
+          setMessages(prev => [...prev, botMessage])
+        },
+        onChunk: (data) => {
+          chunkBufferRef.current += data.content
+          if (!flushRafRef.current) {
+            flushRafRef.current = requestAnimationFrame(() => {
+              flushRafRef.current = null
+              flushBuffer(botMessageId)
+            })
+          }
+        },
+        onDone: (data) => {
+          if (flushRafRef.current) {
+            cancelAnimationFrame(flushRafRef.current)
+            flushRafRef.current = null
+          }
+          flushBuffer(botMessageId)
+          setMessages(prev =>
+            prev.map(msg =>
+              msg.id === botMessageId
+                ? { ...msg, performance: data.performance, isStreaming: false }
+                : msg
+            )
+          )
+        },
+        onError: (data) => {
+          setMessages(prev => {
+            const exists = prev.some(msg => msg.id === botMessageId)
+            if (exists) {
+              return prev.map(msg =>
+                msg.id === botMessageId
+                  ? { ...msg, content: data.message || 'An error occurred.', isError: true }
+                  : msg
+              )
+            }
+            return [...prev, {
+              id: botMessageId,
+              role: 'assistant',
+              content: data.message || 'An error occurred.',
+              timestamp: new Date(),
+              isError: true,
+            }]
+          })
+        },
+      })
     } catch (error) {
       console.error('Error:', error)
-      const errorMessage = {
-        id: Date.now() + 1,
-        role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
-        timestamp: new Date(),
-        isError: true
-      }
-      setMessages(prev => [...prev, errorMessage])
+      setMessages(prev => {
+        const exists = prev.some(msg => msg.id === botMessageId)
+        if (exists) {
+          return prev.map(msg =>
+            msg.id === botMessageId
+              ? { ...msg, content: 'Sorry, I encountered an error. Please try again.', isError: true }
+              : msg
+          )
+        }
+        return [...prev, {
+          id: botMessageId,
+          role: 'assistant',
+          content: 'Sorry, I encountered an error. Please try again.',
+          timestamp: new Date(),
+          isError: true,
+        }]
+      })
     } finally {
       setLoading(false)
+      setStreaming(false)
       inputRef.current?.focus()
     }
   }
@@ -209,7 +289,7 @@ function App() {
             <ChatMessage key={message.id} message={message} />
           ))}
           
-          {loading && (
+          {loading && !streaming && (
             <div className="flex items-start space-x-3">
               <div className="bg-blue-600 p-2 rounded-full">
                 <Bot className="w-5 h-5 text-white" />

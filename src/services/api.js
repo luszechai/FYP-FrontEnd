@@ -18,7 +18,7 @@ export const chat = async (query, useMemory = true) => {
   return response.data
 }
 
-export const chatStream = async (query, useMemory = true, onChunk) => {
+export const chatStream = async (query, useMemory = true, { onMetadata, onChunk, onDone, onError } = {}) => {
   const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
     method: 'POST',
     headers: {
@@ -32,20 +32,29 @@ export const chatStream = async (query, useMemory = true, onChunk) => {
 
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
+  let buffer = ''
 
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
 
-    const chunk = decoder.decode(value)
-    const lines = chunk.split('\n')
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() // keep incomplete trailing line in buffer
 
     for (const line of lines) {
       if (line.startsWith('data: ')) {
         try {
           const data = JSON.parse(line.slice(6))
-          if (onChunk) onChunk(data)
-          if (data.type === 'done' || data.type === 'error') {
+          if (data.type === 'metadata' && onMetadata) {
+            onMetadata(data)
+          } else if (data.type === 'chunk' && onChunk) {
+            onChunk(data)
+          } else if (data.type === 'done') {
+            if (onDone) onDone(data)
+            return data
+          } else if (data.type === 'error') {
+            if (onError) onError(data)
             return data
           }
         } catch (e) {
