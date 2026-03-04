@@ -127,5 +127,22 @@ export const getUploadedFiles = async () => {
   return response.data
 }
 
+// ---- RBS (Room Booking System) ----
+
+export const rbsLogin = async (username, password) => {
+  const response = await api.post('/api/rbs/login', { username, password })
+  return response.data
+}
+
+export const rbsLogout = async () => {
+  const response = await api.post('/api/rbs/logout')
+  return response.data
+}
+
+export const rbsStatus = async () => {
+  const response = await api.get('/api/rbs/status')
+  return response.data
+}
+
 export default api
 

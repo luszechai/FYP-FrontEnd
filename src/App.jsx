@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Trash2, BarChart3, History, Loader2, Bot, User, Paperclip, X, FileUp } from 'lucide-react'
+import { Send, Trash2, BarChart3, History, Loader2, Bot, User, Paperclip, X, FileUp, DoorOpen, LogOut } from 'lucide-react'
 import ChatMessage from './components/ChatMessage'
 import StatsModal from './components/StatsModal'
 import HistoryModal from './components/HistoryModal'
-import { chatStream, clearMemory, getStats, getHistory, uploadFile, removeFile } from './services/api'
+import RbsLoginModal from './components/RbsLoginModal'
+import { chatStream, clearMemory, getStats, getHistory, uploadFile, removeFile, rbsLogout, rbsStatus } from './services/api'
 
 function App() {
   const [messages, setMessages] = useState([])
@@ -15,6 +16,9 @@ function App() {
   const [uploadedFiles, setUploadedFiles] = useState([])
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState(null)
+  const [rbsLoggedIn, setRbsLoggedIn] = useState(false)
+  const [rbsUsername, setRbsUsername] = useState('')
+  const [showRbsLogin, setShowRbsLogin] = useState(false)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -45,6 +49,16 @@ function App() {
       return () => clearTimeout(timer)
     }
   }, [uploadError])
+
+  // Sync RBS login state on mount
+  useEffect(() => {
+    rbsStatus()
+      .then((data) => {
+        setRbsLoggedIn(data.logged_in)
+        setRbsUsername(data.username || '')
+      })
+      .catch(() => {})
+  }, [])
 
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0]
@@ -87,6 +101,16 @@ function App() {
     } catch (error) {
       console.error('Error removing file:', error)
     }
+  }
+
+  const handleRbsLogout = async () => {
+    try {
+      await rbsLogout()
+    } catch (err) {
+      console.error('RBS logout error:', err)
+    }
+    setRbsLoggedIn(false)
+    setRbsUsername('')
   }
 
   const handleSend = async (e) => {
@@ -237,6 +261,28 @@ function App() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            {rbsLoggedIn ? (
+              <div className="flex items-center space-x-1">
+                <span className="text-xs text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded-full hidden sm:inline-block">
+                  RBS: {rbsUsername}
+                </span>
+                <button
+                  onClick={handleRbsLogout}
+                  className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Logout from RBS"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowRbsLogin(true)}
+                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Room Booking Login"
+              >
+                <DoorOpen className="w-5 h-5" />
+              </button>
+            )}
             <button
               onClick={() => setShowHistory(true)}
               className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -400,6 +446,14 @@ function App() {
       {/* Modals */}
       <StatsModal isOpen={showStats} onClose={() => setShowStats(false)} />
       <HistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} />
+      <RbsLoginModal
+        isOpen={showRbsLogin}
+        onClose={() => setShowRbsLogin(false)}
+        onLoginSuccess={(user) => {
+          setRbsLoggedIn(true)
+          setRbsUsername(user)
+        }}
+      />
     </div>
   )
 }
