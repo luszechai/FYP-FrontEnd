@@ -11,6 +11,7 @@ function App() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [streaming, setStreaming] = useState(false)
+  const [loadingStatus, setLoadingStatus] = useState('')
   const [showStats, setShowStats] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState([])
@@ -120,6 +121,7 @@ function App() {
     const userMessage = input.trim()
     setInput('')
     setLoading(true)
+    setLoadingStatus('Thinking...')
 
     // Add user message (include attached files for display)
     const newUserMessage = {
@@ -151,6 +153,9 @@ function App() {
       }
 
       await chatStream(userMessage, true, {
+        onStatus: (data) => {
+          setLoadingStatus(data.message || 'Processing...')
+        },
         onMetadata: (data) => {
           setStreaming(true)
           const botMessage = {
@@ -229,6 +234,7 @@ function App() {
     } finally {
       setLoading(false)
       setStreaming(false)
+      setLoadingStatus('')
       inputRef.current?.focus()
     }
   }
@@ -340,8 +346,21 @@ function App() {
               <div className="bg-blue-600 p-2 rounded-full">
                 <Bot className="w-5 h-5 text-white" />
               </div>
-              <div className="bg-white rounded-2xl rounded-tl-none px-4 py-3 shadow-sm">
-                <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+              <div className="flex-1 max-w-3xl">
+                <div className="bg-white rounded-2xl rounded-tl-none px-4 py-3 shadow-sm space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Loader2 className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
+                    <span className="text-sm text-blue-700 font-medium animate-pulse">
+                      {loadingStatus || 'Thinking...'}
+                    </span>
+                  </div>
+                  <div className="space-y-2.5">
+                    <div className="h-3 bg-gray-100 rounded-full skeleton-shimmer w-full" />
+                    <div className="h-3 bg-gray-100 rounded-full skeleton-shimmer w-11/12" style={{ animationDelay: '0.15s' }} />
+                    <div className="h-3 bg-gray-100 rounded-full skeleton-shimmer w-4/5" style={{ animationDelay: '0.3s' }} />
+                    <div className="h-3 bg-gray-100 rounded-full skeleton-shimmer w-9/12" style={{ animationDelay: '0.45s' }} />
+                  </div>
+                </div>
               </div>
             </div>
           )}

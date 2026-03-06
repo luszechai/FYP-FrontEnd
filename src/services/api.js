@@ -18,7 +18,7 @@ export const chat = async (query, useMemory = true) => {
   return response.data
 }
 
-export const chatStream = async (query, useMemory = true, { onMetadata, onChunk, onDone, onError } = {}) => {
+export const chatStream = async (query, useMemory = true, { onMetadata, onChunk, onDone, onError, onStatus } = {}) => {
   const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
     method: 'POST',
     headers: {
@@ -46,7 +46,9 @@ export const chatStream = async (query, useMemory = true, { onMetadata, onChunk,
       if (line.startsWith('data: ')) {
         try {
           const data = JSON.parse(line.slice(6))
-          if (data.type === 'metadata' && onMetadata) {
+          if (data.type === 'status' && onStatus) {
+            onStatus(data)
+          } else if (data.type === 'metadata' && onMetadata) {
             onMetadata(data)
           } else if (data.type === 'chunk' && onChunk) {
             onChunk(data)
