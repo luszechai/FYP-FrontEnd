@@ -99,8 +99,8 @@ const ChatMessage = React.memo(({ message }) => {
   const sources = message.sources || []
 
   return (
-    <div className={`flex items-start space-x-3 ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
-      <div className={`p-2 rounded-full ${isUser ? 'bg-indigo-600' : 'bg-blue-600'}`}>
+    <div className={`flex items-start gap-2 sm:gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+      <div className={`p-1.5 sm:p-2 rounded-full shrink-0 ${isUser ? 'bg-indigo-600' : 'bg-blue-600'}`}>
         {isUser ? (
           <User className="w-5 h-5 text-white" />
         ) : (
@@ -108,9 +108,9 @@ const ChatMessage = React.memo(({ message }) => {
         )}
       </div>
       
-      <div className={`flex-1 max-w-3xl ${isUser ? 'flex flex-col items-end' : ''}`}>
+      <div className={`flex-1 min-w-0 max-w-3xl ${isUser ? 'flex flex-col items-end' : ''}`}>
         <div
-          className={`rounded-2xl px-4 py-3 shadow-sm ${
+          className={`rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3 shadow-sm ${
             isUser
               ? 'bg-indigo-600 text-white rounded-tr-none'
               : isError

@@ -42,25 +42,25 @@ const RbsLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full my-auto">
         {/* Header */}
-        <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <DoorOpen className="w-6 h-6 text-blue-600" />
-            <h2 className="text-2xl font-bold text-gray-900">RBS Login</h2>
+        <div className="border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-2">
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+            <DoorOpen className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 shrink-0" />
+            <h2 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">RBS Login</h2>
           </div>
           <button
             onClick={handleClose}
             disabled={loading}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 touch-manipulation shrink-0"
           >
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
           <p className="text-sm text-gray-600">
             Log in with your CIHE Room Booking System credentials to enable room availability queries.
           </p>

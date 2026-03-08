@@ -12,7 +12,7 @@ const SourcePopover = ({ source, position = 'top' }) => {
 
   return (
     <div
-      className={`absolute z-50 w-72 bg-white rounded-lg shadow-xl border border-gray-200 p-3 text-left text-sm
+      className={`absolute z-50 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-xl border border-gray-200 p-3 text-left text-sm
         ${position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'}`}
     >
       <div className="flex items-start justify-between gap-2 mb-1.5">

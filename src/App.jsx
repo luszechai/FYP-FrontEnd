@@ -165,13 +165,10 @@ function App() {
       }
 
       await chatStream(userMessage, true, {
-<<<<<<< Updated upstream
+        provider: selectedProvider,
         onStatus: (data) => {
           setLoadingStatus(data.message || 'Processing...')
         },
-=======
-        provider: selectedProvider,
->>>>>>> Stashed changes
         onMetadata: (data) => {
           setStreaming(true)
           const botMessage = {
@@ -269,25 +266,25 @@ function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-2 rounded-lg">
-              <Bot className="w-6 h-6 text-white" />
+    <div className="flex flex-col min-h-screen min-h-screen-dvh bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Header - compact on mobile, touch-friendly */}
+      <header className="bg-white shadow-sm border-b border-gray-200 shrink-0 pt-safe-top">
+        <div className="max-w-4xl mx-auto px-3 py-3 sm:px-4 sm:py-4 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center min-w-0 flex-1 sm:flex-initial">
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-1.5 sm:p-2 rounded-lg shrink-0">
+              <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">SFU Admission Chatbot</h1>
-              <p className="text-sm text-gray-500">Ask me anything about admissions</p>
+            <div className="min-w-0 ml-2 sm:ml-3">
+              <h1 className="text-base sm:text-xl font-bold text-gray-900 truncate">SFU Admission Chatbot</h1>
+              <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">Ask me anything about admissions</p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-0.5 sm:gap-2 flex-shrink-0">
             {providers.length > 1 && (
               <select
                 value={selectedProvider}
                 onChange={(e) => setSelectedProvider(e.target.value)}
-                className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="text-xs sm:text-sm border border-gray-300 rounded-lg px-1.5 py-1 sm:px-2 sm:py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[44px]"
                 title="Select AI Model"
               >
                 {providers.map((p) => (
@@ -298,13 +295,13 @@ function App() {
               </select>
             )}
             {rbsLoggedIn ? (
-              <div className="flex items-center space-x-1">
+              <div className="flex items-center gap-0.5 sm:gap-1">
                 <span className="text-xs text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded-full hidden sm:inline-block">
                   RBS: {rbsUsername}
                 </span>
                 <button
                   onClick={handleRbsLogout}
-                  className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors touch-manipulation"
                   title="Logout from RBS"
                 >
                   <LogOut className="w-5 h-5" />
@@ -313,7 +310,7 @@ function App() {
             ) : (
               <button
                 onClick={() => setShowRbsLogin(true)}
-                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors touch-manipulation"
                 title="Room Booking Login"
               >
                 <DoorOpen className="w-5 h-5" />
@@ -321,21 +318,21 @@ function App() {
             )}
             <button
               onClick={() => setShowHistory(true)}
-              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors touch-manipulation"
               title="View History"
             >
               <History className="w-5 h-5" />
             </button>
             <button
               onClick={() => setShowStats(true)}
-              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors touch-manipulation"
               title="View Statistics"
             >
               <BarChart3 className="w-5 h-5" />
             </button>
             <button
               onClick={handleClear}
-              className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors touch-manipulation"
               title="Clear Conversation"
             >
               <Trash2 className="w-5 h-5" />
@@ -344,20 +341,20 @@ function App() {
         </div>
       </header>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
+      {/* Messages - scrollable, responsive padding */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-4 sm:py-6">
         <div className="max-w-4xl mx-auto space-y-4">
           {messages.length === 0 && (
-            <div className="text-center py-12">
-              <div className="bg-white rounded-2xl shadow-sm p-8 max-w-md mx-auto">
-                <Bot className="w-16 h-16 text-blue-600 mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to SFU Admission Chatbot</h2>
-                <p className="text-gray-600 mb-6">
+            <div className="text-center py-8 sm:py-12">
+              <div className="bg-white rounded-2xl shadow-sm p-5 sm:p-8 max-w-md mx-auto">
+                <Bot className="w-12 h-12 sm:w-16 sm:h-16 text-blue-600 mx-auto mb-3 sm:mb-4" />
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Welcome to SFU Admission Chatbot</h2>
+                <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
                   I can help you with questions about admissions, courses, programs, faculty, and more.
                 </p>
-                <div className="text-left space-y-2 text-sm text-gray-500">
+                <div className="text-left space-y-2 text-xs sm:text-sm text-gray-500">
                   <p className="font-semibold text-gray-700">Try asking:</p>
-                  <ul className="list-disc list-inside space-y-1 ml-4">
+                  <ul className="list-disc list-inside space-y-1 ml-2 sm:ml-4">
                     <li>"What courses are available in Computer Science?"</li>
                     <li>"Tell me about admission requirements"</li>
                     <li>"What are the scholarship deadlines?"</li>
@@ -372,12 +369,12 @@ function App() {
           ))}
           
           {loading && !streaming && (
-            <div className="flex items-start space-x-3">
-              <div className="bg-blue-600 p-2 rounded-full">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <div className="bg-blue-600 p-1.5 sm:p-2 rounded-full shrink-0">
                 <Bot className="w-5 h-5 text-white" />
               </div>
-              <div className="flex-1 max-w-3xl">
-                <div className="bg-white rounded-2xl rounded-tl-none px-4 py-3 shadow-sm space-y-3">
+              <div className="flex-1 min-w-0 max-w-3xl">
+                <div className="bg-white rounded-2xl rounded-tl-none px-3 py-2.5 sm:px-4 sm:py-3 shadow-sm space-y-3">
                   <div className="flex items-center space-x-2">
                     <Loader2 className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
                     <span className="text-sm text-blue-700 font-medium animate-pulse">
@@ -399,9 +396,9 @@ function App() {
         </div>
       </div>
 
-      {/* Input */}
-      <div className="bg-white border-t border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 py-4">
+      {/* Input - safe area for notched phones, touch-friendly */}
+      <div className="bg-white border-t border-gray-200 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="max-w-4xl mx-auto px-3 py-3 sm:px-4 sm:py-4">
           {/* Upload error toast */}
           {uploadError && (
             <div className="mb-2 px-3 py-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg flex items-center justify-between">
@@ -414,14 +411,14 @@ function App() {
 
           {/* Uploaded file badges */}
           {uploadedFiles.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2">
+            <div className="mb-2 flex flex-wrap gap-1.5 sm:gap-2">
               {uploadedFiles.map((file) => (
                 <div
                   key={file.file_id}
-                  className="flex items-center space-x-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs px-2.5 py-1.5 rounded-full"
+                  className="flex items-center space-x-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-full"
                 >
                   <FileUp className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="max-w-[150px] truncate" title={file.filename}>{file.filename}</span>
+                  <span className="max-w-[100px] sm:max-w-[150px] truncate" title={file.filename}>{file.filename}</span>
                   <button
                     onClick={() => handleFileRemove(file.file_id)}
                     className="text-blue-400 hover:text-red-500 transition-colors flex-shrink-0"
@@ -434,7 +431,7 @@ function App() {
             </div>
           )}
 
-          <form onSubmit={handleSend} className="flex items-end space-x-3">
+          <form onSubmit={handleSend} className="flex items-center gap-2 sm:gap-3">
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
@@ -444,12 +441,12 @@ function App() {
               className="hidden"
             />
 
-            {/* Paperclip button */}
+            {/* Paperclip button - same height as input, min 44px touch target */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading || uploadedFiles.length >= MAX_FILES}
-              className="p-3 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center shrink-0 w-12 h-12 min-h-[44px] min-w-[44px] leading-none text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
               title={uploadedFiles.length >= MAX_FILES ? `Maximum ${MAX_FILES} files` : 'Attach a file'}
             >
               {uploading ? (
@@ -459,7 +456,7 @@ function App() {
               )}
             </button>
 
-            <div className="flex-1">
+            <div className="flex-1 min-h-[48px] flex items-stretch">
               <textarea
                 ref={inputRef}
                 value={input}
@@ -471,16 +468,16 @@ function App() {
                   }
                 }}
                 placeholder="Ask a question about SFU admissions..."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none min-h-[48px]"
                 rows={1}
                 disabled={loading}
-                style={{ minHeight: '48px', maxHeight: '120px' }}
+                style={{ maxHeight: '120px' }}
               />
             </div>
             <button
               type="submit"
               disabled={!input.trim() || loading}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3 rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
+              className="flex items-center justify-center shrink-0 w-12 h-12 min-h-[44px] min-w-[44px] leading-none bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl touch-manipulation"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />

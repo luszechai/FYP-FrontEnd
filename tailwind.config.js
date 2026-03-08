@@ -6,6 +6,14 @@ export default {
   ],
   theme: {
     extend: {
+      /* Safe area for notched devices */
+      spacing: {
+        'safe-bottom': 'env(safe-area-inset-bottom)',
+        'safe-top': 'env(safe-area-inset-top)',
+      },
+      minHeight: {
+        'screen-dvh': '100dvh',
+      },
       colors: {
         primary: {
           50: '#f0f9ff',

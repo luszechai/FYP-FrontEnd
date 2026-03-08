@@ -48,12 +48,12 @@ const StatsModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-          <div className="flex items-center space-x-3">
-            <BarChart3 className="w-6 h-6 text-blue-600" />
-            <h2 className="text-2xl font-bold text-gray-900">Session Statistics</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] min-h-0 my-auto overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between z-10 gap-2">
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+            <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 shrink-0" />
+            <h2 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">Session Statistics</h2>
           </div>
           <div className="flex items-center space-x-2">
             <button
@@ -65,14 +65,14 @@ const StatsModal = ({ isOpen, onClose }) => {
             </button>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-gray-100 rounded-lg transition-colors touch-manipulation"
             >
               <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {/* Evaluation Settings Panel */}
           {showSettings && (
             <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">

@@ -19,11 +19,7 @@ export const chat = async (query, useMemory = true, provider = null) => {
   return response.data
 }
 
-<<<<<<< Updated upstream
-export const chatStream = async (query, useMemory = true, { onMetadata, onChunk, onDone, onError, onStatus } = {}) => {
-=======
-export const chatStream = async (query, useMemory = true, { onMetadata, onChunk, onDone, onError, provider } = {}) => {
->>>>>>> Stashed changes
+export const chatStream = async (query, useMemory = true, { onMetadata, onChunk, onDone, onError, onStatus, provider } = {}) => {
   const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
     method: 'POST',
     headers: {
