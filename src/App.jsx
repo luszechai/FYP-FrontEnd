@@ -4,7 +4,7 @@ import ChatMessage from './components/ChatMessage'
 import StatsModal from './components/StatsModal'
 import HistoryModal from './components/HistoryModal'
 import RbsLoginModal from './components/RbsLoginModal'
-import { chatStream, clearMemory, getStats, getHistory, uploadFile, removeFile, rbsLogout, rbsStatus } from './services/api'
+import { chatStream, clearMemory, getStats, getHistory, uploadFile, removeFile, rbsLogout, rbsStatus, getProviders } from './services/api'
 
 function App() {
   const [messages, setMessages] = useState([])
@@ -20,6 +20,8 @@ function App() {
   const [rbsLoggedIn, setRbsLoggedIn] = useState(false)
   const [rbsUsername, setRbsUsername] = useState('')
   const [showRbsLogin, setShowRbsLogin] = useState(false)
+  const [providers, setProviders] = useState([])
+  const [selectedProvider, setSelectedProvider] = useState('deepseek')
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -57,6 +59,16 @@ function App() {
       .then((data) => {
         setRbsLoggedIn(data.logged_in)
         setRbsUsername(data.username || '')
+      })
+      .catch(() => {})
+  }, [])
+
+  // Fetch available LLM providers on mount
+  useEffect(() => {
+    getProviders()
+      .then((data) => {
+        setProviders(data.providers || [])
+        if (data.default) setSelectedProvider(data.default)
       })
       .catch(() => {})
   }, [])
@@ -153,9 +165,13 @@ function App() {
       }
 
       await chatStream(userMessage, true, {
+<<<<<<< Updated upstream
         onStatus: (data) => {
           setLoadingStatus(data.message || 'Processing...')
         },
+=======
+        provider: selectedProvider,
+>>>>>>> Stashed changes
         onMetadata: (data) => {
           setStreaming(true)
           const botMessage = {
@@ -267,6 +283,20 @@ function App() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            {providers.length > 1 && (
+              <select
+                value={selectedProvider}
+                onChange={(e) => setSelectedProvider(e.target.value)}
+                className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                title="Select AI Model"
+              >
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            )}
             {rbsLoggedIn ? (
               <div className="flex items-center space-x-1">
                 <span className="text-xs text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded-full hidden sm:inline-block">

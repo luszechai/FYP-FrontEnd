@@ -10,15 +10,20 @@ const api = axios.create({
   timeout: 300000, // 5 minutes timeout for longer responses
 })
 
-export const chat = async (query, useMemory = true) => {
+export const chat = async (query, useMemory = true, provider = null) => {
   const response = await api.post('/api/chat', {
     query,
     use_memory: useMemory,
+    ...(provider && { provider }),
   })
   return response.data
 }
 
+<<<<<<< Updated upstream
 export const chatStream = async (query, useMemory = true, { onMetadata, onChunk, onDone, onError, onStatus } = {}) => {
+=======
+export const chatStream = async (query, useMemory = true, { onMetadata, onChunk, onDone, onError, provider } = {}) => {
+>>>>>>> Stashed changes
   const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
     method: 'POST',
     headers: {
@@ -27,6 +32,7 @@ export const chatStream = async (query, useMemory = true, { onMetadata, onChunk,
     body: JSON.stringify({
       query,
       use_memory: useMemory,
+      ...(provider && { provider }),
     }),
   })
 
@@ -126,6 +132,13 @@ export const removeFile = async (fileId) => {
 
 export const getUploadedFiles = async () => {
   const response = await api.get('/api/upload')
+  return response.data
+}
+
+// ---- LLM Providers ----
+
+export const getProviders = async () => {
+  const response = await api.get('/api/providers')
   return response.data
 }
 
