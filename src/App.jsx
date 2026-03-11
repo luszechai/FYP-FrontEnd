@@ -126,16 +126,14 @@ function App() {
     setRbsUsername('')
   }
 
-  const handleSend = async (e) => {
-    e.preventDefault()
-    if (!input.trim() || loading) return
+  const sendMessage = useCallback(async (text) => {
+    const userMessage = text.trim()
+    if (!userMessage || loading) return
 
-    const userMessage = input.trim()
     setInput('')
     setLoading(true)
     setLoadingStatus('Thinking...')
 
-    // Add user message (include attached files for display)
     const newUserMessage = {
       id: Date.now(),
       role: 'user',
@@ -250,6 +248,11 @@ function App() {
       setLoadingStatus('')
       inputRef.current?.focus()
     }
+  }, [loading, uploadedFiles, selectedProvider])
+
+  const handleSend = async (e) => {
+    e.preventDefault()
+    sendMessage(input)
   }
 
   const handleClear = async () => {
@@ -365,7 +368,11 @@ function App() {
           )}
           
           {messages.map((message) => (
-            <ChatMessage key={message.id} message={message} />
+            <ChatMessage
+              key={message.id}
+              message={message}
+              onQuickReply={(text) => sendMessage(text)}
+            />
           ))}
           
           {loading && !streaming && (
