@@ -142,9 +142,6 @@ textarea {
   font-weight: 600;
 }
 
-.prose tr:nth-child(even) {
-  background-color: #f9fafb;
-}
 
 .prose a {
   color: #3b82f6;

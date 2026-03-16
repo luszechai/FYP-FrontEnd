@@ -47,6 +47,41 @@ function withCitations(Component, sources) {
   }
 }
 
+function StatusTable({node, children, ...props}) {
+  const tableRef = React.useRef(null)
+
+  React.useLayoutEffect(() => {
+    const table = tableRef.current
+    if (!table) return
+    const headers = table.querySelectorAll('thead th')
+    let statusIdx = -1
+    headers.forEach((th, i) => {
+      if (th.textContent.trim().toLowerCase() === 'status') statusIdx = i
+    })
+    if (statusIdx < 0) return
+    table.querySelectorAll('tbody tr').forEach(tr => {
+      const cells = tr.querySelectorAll('td')
+      const statusCell = cells[statusIdx]
+      if (!statusCell) return
+      const text = statusCell.textContent.trim().toLowerCase()
+      tr.classList.remove('bg-green-50', 'bg-red-50')
+      if (text === 'free' || text === '\u2013' || text === '-') {
+        tr.classList.add('bg-green-50')
+      } else if (text) {
+        tr.classList.add('bg-red-50')
+      }
+    })
+  })
+
+  return (
+    <div className="overflow-x-auto my-2">
+      <table ref={tableRef} className="w-full border-collapse text-sm" {...props}>
+        {children}
+      </table>
+    </div>
+  )
+}
+
 const markdownComponents = {
   h1: ({node, ...props}) => <h1 className="text-xl font-bold mb-2 mt-4 first:mt-0" {...props} />,
   h2: ({node, ...props}) => <h2 className="text-lg font-bold mb-2 mt-3 first:mt-0" {...props} />,
@@ -57,9 +92,14 @@ const markdownComponents = {
   p: ({node, ...props}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} />,
   strong: ({node, ...props}) => <strong className="font-semibold" {...props} />,
   em: ({node, ...props}) => <em className="italic" {...props} />,
-  table: ({node, ...props}) => <div className="overflow-x-auto my-2"><table className="w-full border-collapse text-sm" {...props} /></div>,
-  th: ({node, ...props}) => <th className="border border-gray-300 bg-gray-100 px-3 py-1.5 text-left font-semibold text-gray-700" {...props} />,
-  td: ({node, ...props}) => <td className="border border-gray-300 px-3 py-1.5 text-gray-600" {...props} />,
+  table: StatusTable,
+  tr: ({node, ...props}) => <tr {...props} />,
+  th: ({node, ...props}) => (
+    <th className="border border-gray-300 bg-gray-100 px-3 py-1.5 text-left font-semibold text-gray-700" {...props} />
+  ),
+  td: ({node, ...props}) => (
+    <td className="border border-gray-300 px-3 py-1.5 text-gray-600" {...props} />
+  ),
 }
 
 function RichContent({ content, sources }) {
