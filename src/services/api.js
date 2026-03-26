@@ -131,6 +131,20 @@ export const getUploadedFiles = async () => {
   return response.data
 }
 
+// ---- Emails ----
+
+export const getEmails = async () => {
+  const response = await api.get('/api/emails')
+  return response.data
+}
+
+export const getEmailHtml = async (emailId) => {
+  const response = await api.get(`/api/emails/${emailId}/html`, {
+    transformResponse: [(data) => data],
+  })
+  return response.data
+}
+
 // ---- LLM Providers ----
 
 export const getProviders = async () => {

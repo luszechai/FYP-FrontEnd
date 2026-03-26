@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Trash2, BarChart3, History, Loader2, Bot, User, Paperclip, X, FileUp, DoorOpen, LogOut } from 'lucide-react'
+import { Send, Trash2, BarChart3, History, Loader2, Bot, User, Paperclip, X, FileUp, DoorOpen, LogOut, Mail } from 'lucide-react'
 import ChatMessage from './components/ChatMessage'
 import StatsModal from './components/StatsModal'
 import HistoryModal from './components/HistoryModal'
 import RbsLoginModal from './components/RbsLoginModal'
+import EmailsModal from './components/EmailsModal'
 import { chatStream, clearMemory, getStats, getHistory, uploadFile, removeFile, rbsLogout, rbsStatus, getProviders } from './services/api'
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
   const [rbsLoggedIn, setRbsLoggedIn] = useState(false)
   const [rbsUsername, setRbsUsername] = useState('')
   const [showRbsLogin, setShowRbsLogin] = useState(false)
+  const [showEmails, setShowEmails] = useState(false)
   const [providers, setProviders] = useState([])
   const [selectedProvider, setSelectedProvider] = useState('deepseek')
   const messagesEndRef = useRef(null)
@@ -196,11 +198,13 @@ function App() {
           }
           flushBuffer(botMessageId)
           setMessages(prev =>
-            prev.map(msg =>
-              msg.id === botMessageId
-                ? { ...msg, performance: data.performance, isStreaming: false }
-                : msg
-            )
+            prev.map(msg => {
+              if (msg.id !== botMessageId) return msg
+              const updates = { ...msg, performance: data.performance, isStreaming: false }
+              if (data.sources) updates.sources = data.sources
+              if (data.full_response) updates.content = data.full_response
+              return updates
+            })
           )
         },
         onError: (data) => {
@@ -319,6 +323,13 @@ function App() {
                 <DoorOpen className="w-5 h-5" />
               </button>
             )}
+            <button
+              onClick={() => setShowEmails(true)}
+              className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors touch-manipulation"
+              title="View Emails"
+            >
+              <Mail className="w-5 h-5" />
+            </button>
             <button
               onClick={() => setShowHistory(true)}
               className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors touch-manipulation"
@@ -497,6 +508,7 @@ function App() {
       </div>
 
       {/* Modals */}
+      <EmailsModal isOpen={showEmails} onClose={() => setShowEmails(false)} />
       <StatsModal isOpen={showStats} onClose={() => setShowStats(false)} />
       <HistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} />
       <RbsLoginModal
