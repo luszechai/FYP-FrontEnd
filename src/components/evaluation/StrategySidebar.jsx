@@ -5,9 +5,11 @@ import { STRATEGY_ORDER, STRATEGY_META } from './utils'
 /**
  * Left-hand configuration panel for the Evaluation Dashboard.
  *
- * The user selects which query-time strategies to enable, how many questions
- * to include, and an optional run label. "Execute A/B" kicks off a paired
- * run: first an all-strategies-off baseline, then the selected configuration.
+ * The user selects which query-time strategies to enable (zero or more),
+ * how many questions to include, and an optional run label. "Execute
+ * Evaluation" runs a single evaluation with the current toggle set:
+ *   - all toggles off  → a plain-chatbot "Baseline" run (saved once, reused)
+ *   - any toggle on    → an "Optimized" run, auto-loaded into the right panel
  *
  * Progress is rendered live here so the user can watch question-by-question
  * status without scrolling.
@@ -39,7 +41,9 @@ export default function StrategySidebar({
       <div className="px-4 py-3 border-b border-gray-200">
         <h2 className="text-sm font-semibold text-gray-900">Configuration</h2>
         <p className="text-xs text-gray-500 mt-0.5">
-          Pick strategies to compare against a fresh all-off baseline.
+          {anyEnabled
+            ? 'Run with selected strategies — saved as an Optimized run.'
+            : 'No strategies selected — runs the plain chatbot as Baseline.'}
         </p>
       </div>
 
@@ -158,7 +162,7 @@ export default function StrategySidebar({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-[11px] text-gray-600">
               <span className="font-medium">
-                {progress.phase === 'baseline' ? 'Baseline' : 'Optimized'}:{' '}
+                {progress.phaseLabel || (anyEnabled ? 'Optimized' : 'Baseline')}:{' '}
                 {progress.index || 0} / {progress.total || '?'}
               </span>
               <span>{progressPct !== null ? `${progressPct}%` : '...'}</span>
@@ -195,7 +199,7 @@ export default function StrategySidebar({
           ) : (
             <>
               <Play className="w-4 h-4" />
-              Execute A/B Evaluation
+              {anyEnabled ? 'Execute Evaluation' : 'Run Baseline (no strategies)'}
             </>
           )}
         </button>

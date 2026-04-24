@@ -28,12 +28,17 @@ const DEFAULT_STRATEGIES = {
 /**
  * Full-screen Evaluation Dashboard overlay.
  *
- * Orchestrates the A/B evaluation flow end-to-end:
- *   1. User picks strategy toggles in the sidebar.
- *   2. "Execute A/B" runs the Baseline (all-off) then the Optimized run,
- *      streaming per-question progress via SSE.
- *   3. On completion, both runs are loaded into the comparison panels and
- *      drive the Executive Summary, Progress Over Time chart, and Deep Dive.
+ * Orchestrates the evaluation flow end-to-end:
+ *   1. User picks strategy toggles in the sidebar (zero or more).
+ *   2. "Execute Evaluation" runs a single evaluation with those toggles
+ *      and streams per-question progress via SSE:
+ *        - zero toggles → saved as a plain-chatbot Baseline run
+ *        - any toggle   → saved as an Optimized run
+ *      The Baseline only needs to be run once; it's reused automatically.
+ *   3. On completion, the Baseline panel auto-loads the most recent all-off
+ *      run and the Optimized panel auto-loads the newest strategy-enabled
+ *      run; together they drive the Executive Summary, Progress Over Time
+ *      chart, and Deep Dive table.
  *   4. The run-picker dropdowns on each panel let the user swap to any
  *      other saved run — this is the chunking/dataset A/B workflow.
  */
@@ -101,6 +106,23 @@ export default function EvaluationDashboard({ isOpen, onClose }) {
       cancelled = true
     }
   }, [isOpen, refreshRuns])
+
+  // Auto-select sensible defaults for the two comparison panels whenever the
+  // run list changes (first open, after a fresh run, after refresh). Baseline
+  // prefers the most recent all-strategies-off run; Optimized prefers the
+  // most recent run with at least one strategy enabled.
+  useEffect(() => {
+    if (!runs.length) return
+    const isAllOff = (r) => STRATEGY_ORDER.every((k) => !r?.strategies?.[k])
+    if (!baselineRunId) {
+      const base = runs.find(isAllOff)
+      if (base) setBaselineRunId(base.id)
+    }
+    if (!optimizedRunId) {
+      const opt = runs.find((r) => !isAllOff(r))
+      if (opt) setOptimizedRunId(opt.id)
+    }
+  }, [runs, baselineRunId, optimizedRunId])
 
   // Fetch full run detail when either panel selection changes ---------------
   useEffect(() => {
@@ -178,34 +200,29 @@ export default function EvaluationDashboard({ isOpen, onClose }) {
   }
 
   const anyEnabled = STRATEGY_ORDER.some((k) => strategies[k])
+  const runIsBaseline = !anyEnabled
 
-  const disabledReason = !testsetSize
-    ? 'Testset unavailable'
-    : !anyEnabled
-      ? 'Turn on at least one strategy for the Optimized run'
-      : null
+  const disabledReason = !testsetSize ? 'Testset unavailable' : null
 
-  // A/B execution ----------------------------------------------------------
-  const executeAB = useCallback(async () => {
+  // Single-run execution ---------------------------------------------------
+  const executeRun = useCallback(async () => {
     if (running) return
-    if (!anyEnabled) {
-      setRunError('Turn on at least one strategy for the Optimized run.')
-      return
-    }
+
+    const phaseLabel = runIsBaseline ? 'Baseline' : 'Optimized'
 
     setRunning(true)
     setRunError(null)
-    setProgress({ phase: 'baseline', index: 0, total: maxQuestions })
+    setProgress({ phaseLabel, index: 0, total: maxQuestions })
 
     const abort = new AbortController()
     abortRef.current = abort
 
-    const makeHandler = (phase) => (evt) => {
+    const onEvent = (evt) => {
       if (!evt || typeof evt !== 'object') return
       switch (evt.type) {
         case 'question_started':
           setProgress({
-            phase,
+            phaseLabel,
             index: evt.index,
             total: evt.total,
             currentQuestion: evt.question,
@@ -214,7 +231,7 @@ export default function EvaluationDashboard({ isOpen, onClose }) {
         case 'question_done':
           setProgress((prev) => ({
             ...(prev || {}),
-            phase,
+            phaseLabel,
             index: evt.index,
             total: evt.total,
           }))
@@ -222,7 +239,7 @@ export default function EvaluationDashboard({ isOpen, onClose }) {
         case 'ragas_started':
           setProgress((prev) => ({
             ...(prev || {}),
-            phase,
+            phaseLabel,
             currentQuestion: 'Scoring with Ragas metrics...',
           }))
           break
@@ -235,52 +252,45 @@ export default function EvaluationDashboard({ isOpen, onClose }) {
     }
 
     const timestampLabel = new Date().toISOString().slice(0, 19).replace('T', ' ')
-    const optimizedLabel =
-      (runLabel || '').trim() || `Optimized ${timestampLabel}`
-    const baselineLabel = `Baseline ${timestampLabel}`
-
-    let baselineId = null
-    let optimizedId = null
+    const label =
+      (runLabel || '').trim() ||
+      (runIsBaseline ? `Baseline ${timestampLabel}` : `Optimized ${timestampLabel}`)
 
     try {
-      const baseFinal = await streamEvaluationProgress({
-        strategies: ALL_STRATEGIES_OFF,
-        label: baselineLabel,
+      const final = await streamEvaluationProgress({
+        strategies: runIsBaseline ? ALL_STRATEGIES_OFF : strategies,
+        label,
         maxQuestions,
         signal: abort.signal,
-        onEvent: makeHandler('baseline'),
+        onEvent,
       })
-      baselineId = baseFinal?.run_id || null
-
-      setProgress({ phase: 'optimized', index: 0, total: maxQuestions })
-
-      const optFinal = await streamEvaluationProgress({
-        strategies,
-        label: optimizedLabel,
-        maxQuestions,
-        signal: abort.signal,
-        onEvent: makeHandler('optimized'),
-      })
-      optimizedId = optFinal?.run_id || null
+      const newRunId = final?.run_id || null
 
       const freshRuns = await refreshRuns()
-      if (baselineId) setBaselineRunId(baselineId)
-      else if (freshRuns[1]?.id) setBaselineRunId(freshRuns[1].id)
 
-      if (optimizedId) setOptimizedRunId(optimizedId)
-      else if (freshRuns[0]?.id) setOptimizedRunId(freshRuns[0].id)
+      if (runIsBaseline) {
+        if (newRunId) setBaselineRunId(newRunId)
+      } else {
+        if (newRunId) setOptimizedRunId(newRunId)
+        if (!baselineRunId) {
+          const mostRecentBaseline = freshRuns.find((r) =>
+            STRATEGY_ORDER.every((k) => !r?.strategies?.[k]),
+          )
+          if (mostRecentBaseline) setBaselineRunId(mostRecentBaseline.id)
+        }
+      }
 
       setProgress(null)
     } catch (err) {
       if (err?.name !== 'AbortError') {
-        console.error('A/B run failed:', err)
+        console.error('Evaluation run failed:', err)
         setRunError(err?.message || 'Evaluation failed.')
       }
     } finally {
       setRunning(false)
       abortRef.current = null
     }
-  }, [running, anyEnabled, maxQuestions, strategies, runLabel, refreshRuns])
+  }, [running, runIsBaseline, maxQuestions, strategies, runLabel, refreshRuns, baselineRunId])
 
   // Executive summary values -----------------------------------------------
   const scorecardHistory = useMemo(() => runs, [runs])
@@ -343,11 +353,11 @@ export default function EvaluationDashboard({ isOpen, onClose }) {
           testsetSize={testsetSize}
           runLabel={runLabel}
           onRunLabelChange={setRunLabel}
-          onExecute={executeAB}
+          onExecute={executeRun}
           onReset={handleResetStrategies}
           running={running}
           progress={progress}
-          canExecute={!!testsetSize && anyEnabled}
+          canExecute={!!testsetSize}
           disabledReason={disabledReason}
         />
 
@@ -470,10 +480,12 @@ function EmptyState({ runs, onPickOptimized, onPickBaseline }) {
             Ready to evaluate
           </h2>
           <p className="text-sm text-gray-600 mt-1">
-            Pick the strategies you want to measure on the left, then click
-            <span className="font-semibold"> Execute A/B Evaluation</span>.
-            The dashboard will run an all-off baseline first, then your
-            selected configuration, and chart the difference.
+            Start by running the chatbot with{' '}
+            <span className="font-semibold">no strategies enabled</span> — that
+            saves a reusable Baseline. Then enable any strategies you want to
+            measure and click{' '}
+            <span className="font-semibold">Execute Evaluation</span>; the new
+            run lands in the Optimized panel next to the saved Baseline.
           </p>
           {runs.length > 0 && (
             <div className="mt-3 text-xs text-gray-600">
