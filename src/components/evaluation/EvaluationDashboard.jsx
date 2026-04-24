@@ -65,11 +65,21 @@ export default function EvaluationDashboard({ isOpen, onClose }) {
   const abortRef = useRef(null)
 
   // Load testset size + runs list on open -----------------------------------
+  // Seed/demo runs are filtered out so the dashboard starts clean on first
+  // access. A run is considered a seed if its testset_hash matches the known
+  // placeholder or its label starts with "Seed ". Real runs always have a
+  // genuine sha1-prefix hash from compute_testset_hash().
   const refreshRuns = useCallback(async () => {
     try {
       const data = await listEvaluationRuns()
-      setRuns(data?.runs || [])
-      return data?.runs || []
+      const all = data?.runs || []
+      const real = all.filter(
+        (r) =>
+          r?.testset_hash !== 'seed00000000' &&
+          !(typeof r?.label === 'string' && r.label.startsWith('Seed ')),
+      )
+      setRuns(real)
+      return real
     } catch (err) {
       console.error('Failed to list runs:', err)
       return []
