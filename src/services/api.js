@@ -169,5 +169,116 @@ export const rbsStatus = async () => {
   return response.data
 }
 
+// ---- Evaluation Dashboard -------------------------------------------------
+
+export const ALL_STRATEGIES_OFF = Object.freeze({
+  use_reranker: false,
+  use_adaptive: false,
+  use_dedup: false,
+  use_person_boost: false,
+  use_hybrid: false,
+  use_compression: false,
+})
+
+// Metric keys Ragas emits. Order matters for radar / scorecard rendering.
+export const RAGAS_METRICS = Object.freeze([
+  'faithfulness',
+  'answer_relevancy',
+  'context_precision',
+  'context_recall',
+])
+
+export const getTestsetInfo = async (testsetPath = 'eval_testset.json') => {
+  const response = await api.get('/api/ragas/testset', {
+    params: { testset_path: testsetPath },
+  })
+  return response.data
+}
+
+export const runEvaluation = async ({
+  strategies = ALL_STRATEGIES_OFF,
+  label,
+  maxQuestions,
+  testsetPath = 'eval_testset.json',
+} = {}) => {
+  const response = await api.post('/api/ragas/run', {
+    label,
+    max_questions: maxQuestions,
+    testset_path: testsetPath,
+    strategies,
+  })
+  return response.data
+}
+
+export const streamEvaluationProgress = async ({
+  strategies = ALL_STRATEGIES_OFF,
+  label,
+  maxQuestions,
+  testsetPath = 'eval_testset.json',
+  signal,
+  onEvent,
+  onError,
+} = {}) => {
+  const response = await fetch(`${API_BASE_URL}/api/ragas/run/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      label,
+      max_questions: maxQuestions,
+      testset_path: testsetPath,
+      strategies,
+    }),
+    signal,
+  })
+
+  if (!response.ok || !response.body) {
+    const text = await response.text().catch(() => '')
+    const err = new Error(`Evaluation stream failed: ${response.status} ${text}`)
+    if (onError) onError(err)
+    throw err
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let finalEvent = null
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop()
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      try {
+        const data = JSON.parse(line.slice(6))
+        if (onEvent) onEvent(data)
+        if (data.type === 'run_saved' || data.type === 'done') {
+          finalEvent = data
+        } else if (data.type === 'error') {
+          if (onError) onError(data)
+        }
+      } catch (e) {
+        console.error('Error parsing evaluation SSE:', e)
+      }
+    }
+  }
+
+  return finalEvent
+}
+
+export const listEvaluationRuns = async () => {
+  const response = await api.get('/api/ragas/runs')
+  return response.data
+}
+
+export const getEvaluationRun = async (runId) => {
+  const response = await api.get(`/api/ragas/runs/${encodeURIComponent(runId)}`)
+  return response.data
+}
+
 export default api
 

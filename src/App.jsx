@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Trash2, BarChart3, History, Loader2, Bot, User, Paperclip, X, FileUp, DoorOpen, LogOut, Mail } from 'lucide-react'
+import { Send, Trash2, BarChart3, History, Loader2, Bot, User, Paperclip, X, FileUp, DoorOpen, LogOut, Mail, FlaskConical } from 'lucide-react'
 import ChatMessage from './components/ChatMessage'
 import StatsModal from './components/StatsModal'
 import HistoryModal from './components/HistoryModal'
 import RbsLoginModal from './components/RbsLoginModal'
 import EmailsModal from './components/EmailsModal'
+import EvaluationDashboard from './components/evaluation/EvaluationDashboard'
 import { chatStream, clearMemory, getStats, getHistory, uploadFile, removeFile, rbsLogout, rbsStatus, getProviders } from './services/api'
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
   const [rbsUsername, setRbsUsername] = useState('')
   const [showRbsLogin, setShowRbsLogin] = useState(false)
   const [showEmails, setShowEmails] = useState(false)
+  const [showEvaluation, setShowEvaluation] = useState(false)
   const [providers, setProviders] = useState([])
   const [selectedProvider, setSelectedProvider] = useState('deepseek')
   const messagesEndRef = useRef(null)
@@ -345,6 +347,13 @@ function App() {
               <BarChart3 className="w-5 h-5" />
             </button>
             <button
+              onClick={() => setShowEvaluation(true)}
+              className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors touch-manipulation"
+              title="RAG Evaluation Dashboard"
+            >
+              <FlaskConical className="w-5 h-5" />
+            </button>
+            <button
               onClick={handleClear}
               className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors touch-manipulation"
               title="Clear Conversation"
@@ -511,6 +520,10 @@ function App() {
       <EmailsModal isOpen={showEmails} onClose={() => setShowEmails(false)} />
       <StatsModal isOpen={showStats} onClose={() => setShowStats(false)} />
       <HistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} />
+      <EvaluationDashboard
+        isOpen={showEvaluation}
+        onClose={() => setShowEvaluation(false)}
+      />
       <RbsLoginModal
         isOpen={showRbsLogin}
         onClose={() => setShowRbsLogin(false)}
