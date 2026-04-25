@@ -17,6 +17,9 @@ import { STRATEGY_ORDER, STRATEGY_META } from './utils'
 export default function StrategySidebar({
   strategies,
   onToggleStrategy,
+  providers = [],
+  selectedProvider = 'deepseek',
+  onProviderChange,
   maxQuestions,
   onMaxQuestionsChange,
   testsetSize,
@@ -48,6 +51,34 @@ export default function StrategySidebar({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+        {/* Answer model --------------------------------------------------- */}
+        <section>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+            Answer Model
+          </h3>
+          <select
+            value={selectedProvider}
+            onChange={(e) => onProviderChange?.(e.target.value)}
+            disabled={running || providers.length === 0}
+            className="w-full text-sm px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60"
+            title="Select the LLM used for query rewriting and answer generation"
+          >
+            {providers.length > 0 ? (
+              providers.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label} ({p.model})
+                </option>
+              ))
+            ) : (
+              <option value={selectedProvider}>Loading models...</option>
+            )}
+          </select>
+          <p className="text-[11px] text-gray-500 mt-1">
+            Used for query rewriting and answer generation. Ragas scoring stays
+            on the fixed evaluator.
+          </p>
+        </section>
+
         {/* Strategy toggles ---------------------------------------------- */}
         <section>
           <div className="flex items-center justify-between mb-2">
@@ -131,8 +162,7 @@ export default function StrategySidebar({
             {testsetSize
               ? `of ${testsetSize} available`
               : 'testset unavailable'}
-            . Each question runs through DeepSeek ~5× for Ragas, so smaller is
-            faster.
+            . Each question also runs through Ragas scoring, so smaller is faster.
           </p>
         </section>
 

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { X, FlaskConical, AlertCircle, RefreshCw } from 'lucide-react'
 import {
+  getProviders,
   getTestsetInfo,
   listEvaluationRuns,
   getEvaluationRun,
@@ -20,7 +21,7 @@ const DEFAULT_STRATEGIES = {
   use_reranker: true,
   use_adaptive: true,
   use_dedup: true,
-  use_compression: false,
+  use_bm25: true,
   use_hybrid: true,
   use_person_boost: true,
 }
@@ -48,6 +49,8 @@ export default function EvaluationDashboard({ isOpen, onClose }) {
   const [maxQuestions, setMaxQuestions] = useState(10)
   const [testsetSize, setTestsetSize] = useState(null)
   const [testsetError, setTestsetError] = useState(null)
+  const [providers, setProviders] = useState([])
+  const [selectedProvider, setSelectedProvider] = useState('deepseek')
 
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState(null)
@@ -109,6 +112,18 @@ export default function EvaluationDashboard({ isOpen, onClose }) {
             'Failed to load testset metadata. Run generate_testset.py first.',
         )
         setTestsetSize(null)
+      })
+
+    getProviders()
+      .then((data) => {
+        if (cancelled) return
+        const available = data?.providers || []
+        setProviders(available)
+        if (data?.default) setSelectedProvider(data.default)
+      })
+      .catch((err) => {
+        console.error('Provider list error:', err)
+        if (!cancelled) setProviders([])
       })
 
     refreshRuns()
@@ -271,6 +286,7 @@ export default function EvaluationDashboard({ isOpen, onClose }) {
         strategies: runIsBaseline ? ALL_STRATEGIES_OFF : strategies,
         label,
         maxQuestions,
+        provider: selectedProvider,
         signal: abort.signal,
         onEvent,
       })
@@ -300,7 +316,7 @@ export default function EvaluationDashboard({ isOpen, onClose }) {
       setRunning(false)
       abortRef.current = null
     }
-  }, [running, runIsBaseline, maxQuestions, strategies, runLabel, refreshRuns, baselineRunId])
+  }, [running, runIsBaseline, maxQuestions, strategies, runLabel, selectedProvider, refreshRuns, baselineRunId])
 
   // Executive summary values -----------------------------------------------
   const scorecardHistory = useMemo(() => runs, [runs])
@@ -358,6 +374,9 @@ export default function EvaluationDashboard({ isOpen, onClose }) {
         <StrategySidebar
           strategies={strategies}
           onToggleStrategy={handleToggleStrategy}
+          providers={providers}
+          selectedProvider={selectedProvider}
+          onProviderChange={setSelectedProvider}
           maxQuestions={maxQuestions}
           onMaxQuestionsChange={setMaxQuestions}
           testsetSize={testsetSize}

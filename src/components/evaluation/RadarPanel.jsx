@@ -93,6 +93,12 @@ export default function RadarPanel({
             <Database className="w-3 h-3" /> {run.chunk_count} chunks
           </span>
         )}
+        {run?.llm_provider && (
+          <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px]">
+            {(run.llm_provider === 'kimi' ? 'Kimi' : 'DeepSeek')}
+            {run.llm_model ? `: ${run.llm_model}` : ''}
+          </span>
+        )}
         {badges.length > 0 ? (
           <span className="inline-flex items-center gap-1 flex-wrap">
             <Settings2 className="w-3 h-3" />

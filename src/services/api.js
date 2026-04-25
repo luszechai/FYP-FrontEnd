@@ -175,9 +175,9 @@ export const ALL_STRATEGIES_OFF = Object.freeze({
   use_reranker: false,
   use_adaptive: false,
   use_dedup: false,
+  use_bm25: false,
   use_person_boost: false,
   use_hybrid: false,
-  use_compression: false,
 })
 
 // Metric keys Ragas emits. Order matters for radar / scorecard rendering.
@@ -199,11 +199,13 @@ export const runEvaluation = async ({
   strategies = ALL_STRATEGIES_OFF,
   label,
   maxQuestions,
+  provider,
   testsetPath = 'eval_testset.json',
 } = {}) => {
   const response = await api.post('/api/ragas/run', {
     label,
     max_questions: maxQuestions,
+    provider,
     testset_path: testsetPath,
     strategies,
   })
@@ -214,6 +216,7 @@ export const streamEvaluationProgress = async ({
   strategies = ALL_STRATEGIES_OFF,
   label,
   maxQuestions,
+  provider,
   testsetPath = 'eval_testset.json',
   signal,
   onEvent,
@@ -225,6 +228,7 @@ export const streamEvaluationProgress = async ({
     body: JSON.stringify({
       label,
       max_questions: maxQuestions,
+      provider,
       testset_path: testsetPath,
       strategies,
     }),

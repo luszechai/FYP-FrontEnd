@@ -70,6 +70,8 @@ export default function ProgressOverTimeChart({
         axisLabel,
         label: r.label || r.id,
         timestamp: r.timestamp,
+        llmProvider: r.llm_provider,
+        llmModel: r.llm_model,
         strategies: r.strategies || {},
         questionCount: r.question_count,
         runtimeS: r.runtime_s,
@@ -219,6 +221,12 @@ function RunTooltip({ active, payload }) {
       </div>
 
       <div className="mt-2 pt-2 border-t border-gray-100 text-[11px] text-gray-500 space-y-0.5">
+        {row.llmProvider && (
+          <div>
+            Model: {row.llmProvider === 'kimi' ? 'Kimi' : 'DeepSeek'}
+            {row.llmModel ? ` (${row.llmModel})` : ''}
+          </div>
+        )}
         {badges.length > 0 ? (
           <div className="flex flex-wrap gap-1">
             {badges.map((b) => (

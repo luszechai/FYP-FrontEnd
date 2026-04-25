@@ -34,7 +34,7 @@ export const STRATEGY_ORDER = [
   'use_reranker',
   'use_adaptive',
   'use_dedup',
-  'use_compression',
+  'use_bm25',
   'use_hybrid',
   'use_person_boost',
 ]
@@ -58,17 +58,17 @@ export const STRATEGY_META = {
     tooltip:
       'Drops duplicate chunks from the same parent document before reranking.',
   },
-  use_compression: {
-    label: 'Context Compression',
-    short: 'Compress',
+  use_bm25: {
+    label: 'BM25 Keyword Search',
+    short: 'BM25',
     tooltip:
-      'LLM extracts only query-relevant sentences from each chunk before reranking.',
+      'Runs sparse keyword retrieval over indexed chunks. Can run alone or be fused with other retrieval strategies.',
   },
   use_hybrid: {
-    label: 'Hybrid Retrieval',
-    short: 'Hybrid',
+    label: 'Query Expansion & Boosts',
+    short: 'Boosts',
     tooltip:
-      'Fuses BM25 keyword search with vector similarity + keyword-boosted strategies via RRF.',
+      'Adds expanded-query variants and keyword score boosts on top of the baseline vector retrieval. Fuses with BM25 via RRF when BM25 is also enabled.',
   },
   use_person_boost: {
     label: 'Person Query Boost',
