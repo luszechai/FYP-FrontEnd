@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm'
 import {
   X, Mail, GraduationCap, Calendar, Users, Briefcase, ExternalLink, Clock,
   DollarSign, FileText, AlertCircle, ChevronRight, ArrowLeft,
-  ChevronDown, ChevronUp, Code, Image, ClipboardList, Globe,
+  ChevronDown, ChevronUp, Code, ClipboardList, Globe,
   Instagram, AtSign, Link2, Loader2,
 } from 'lucide-react'
 import { getEmails, getEmailHtml } from '../services/api'
@@ -18,6 +18,14 @@ function decodeHtmlEntities(text) {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+}
+
+/** Parse email Date header for sorting; missing/invalid sorts last. */
+function getEmailSortTimestamp(email) {
+  const raw = email?.date
+  if (!raw || typeof raw !== 'string') return 0
+  const ms = Date.parse(raw)
+  return Number.isNaN(ms) ? 0 : ms
 }
 
 /** Return only the body part of stored email content (after the first "---" separator) to avoid duplicating the structured header already shown above */
@@ -67,6 +75,26 @@ const LINK_CATEGORIES = {
   other: { label: 'Other Links', icon: Link2 },
 }
 
+/** Hide XML/schema namespace URLs often mistaken for real links (DOC/PDF/RDF metadata). */
+function isLikelyTechnicalMetadataUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  const trimmed = url.trim()
+  if (!/^https?:\/\//i.test(trimmed)) return false
+  try {
+    const { hostname } = new URL(trimmed)
+    const h = hostname.toLowerCase()
+    return (
+      h.includes('ns.adobe.com')
+      || h.endsWith('w3.org')
+      || h.includes('schemas.microsoft.com')
+      || h.includes('purl.org')
+      || h.includes('ns.attribution.com')
+    )
+  } catch {
+    return false
+  }
+}
+
 function EmailListItem({ email, onClick }) {
   const badgeStyle = BADGE_STYLES[email.type] || BADGE_STYLES.other
   const badgeLabel = BADGE_LABELS[email.type] || BADGE_LABELS.other
@@ -103,11 +131,14 @@ function GroupedLinks({ categorizedLinks }) {
   const groups = {}
   for (const lk of categorizedLinks) {
     const cat = lk.category || 'other'
+    if (cat === 'other') continue
     if (!groups[cat]) groups[cat] = []
     groups[cat].push(lk.url)
   }
 
-  const order = ['enrollment', 'info', 'social', 'contact', 'other']
+  const order = ['enrollment', 'info', 'social', 'contact']
+  const hasAny = order.some((cat) => groups[cat]?.length)
+  if (!hasAny) return null
 
   return (
     <div className="space-y-4">
@@ -144,7 +175,9 @@ function GroupedLinks({ categorizedLinks }) {
 }
 
 function FlatLinks({ linksString }) {
-  const links = linksString ? linksString.split('\n').filter(Boolean) : []
+  const links = linksString
+    ? linksString.split('\n').map((s) => s.trim()).filter(Boolean).filter((u) => !isLikelyTechnicalMetadataUrl(u))
+    : []
   if (links.length === 0) return null
 
   return (
@@ -236,7 +269,9 @@ function EmailDetailView({ email, onBack }) {
   const showSubject = email.subject && email.name && email.subject !== email.name
     && !email.subject.includes('=?')
 
-  const hasCategorizedLinks = email.categorized_links && email.categorized_links.length > 0
+  const hasCategorizedLinks = (email.categorized_links || []).some(
+    (lk) => (lk.category || 'other') !== 'other',
+  )
 
   const metaRows = [
     { icon: Clock, label: 'Application Period', value: email.application_period },
@@ -301,34 +336,6 @@ function EmailDetailView({ email, onBack }) {
           </div>
         )}
 
-        {/* Images */}
-        {email.images && email.images.length > 0 && (
-          <div>
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-              <Image className="w-3.5 h-3.5" />
-              Images
-            </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {email.images.map((url, i) => (
-                <a
-                  key={i}
-                  href={`${API_BASE_URL}${url}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                >
-                  <img
-                    src={`${API_BASE_URL}${url}`}
-                    alt={`Attachment ${i + 1}`}
-                    className="w-full h-32 object-cover"
-                    loading="lazy"
-                  />
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Links */}
         {hasCategorizedLinks ? (
           <GroupedLinks categorizedLinks={email.categorized_links} />
@@ -385,12 +392,15 @@ const EmailsModal = ({ isOpen, onClose }) => {
   }
 
   const getFilteredEmails = () => {
+    let list = []
     if (activeTab === 'all') {
-      return Object.entries(emails).flatMap(([type, list]) =>
-        list.map((e) => ({ ...e, type: e.type || type }))
+      list = Object.entries(emails).flatMap(([type, listPart]) =>
+        listPart.map((e) => ({ ...e, type: e.type || type }))
       )
+    } else {
+      list = (emails[activeTab] || []).map((e) => ({ ...e, type: e.type || activeTab }))
     }
-    return (emails[activeTab] || []).map((e) => ({ ...e, type: e.type || activeTab }))
+    return list.sort((a, b) => getEmailSortTimestamp(b) - getEmailSortTimestamp(a))
   }
 
   const getTabCount = (key) => {
