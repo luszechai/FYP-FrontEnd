@@ -23,6 +23,7 @@ function App() {
   const [rbsUsername, setRbsUsername] = useState('')
   const [showRbsLogin, setShowRbsLogin] = useState(false)
   const [showEmails, setShowEmails] = useState(false)
+  const [emailToOpen, setEmailToOpen] = useState(null)
   const [showEvaluation, setShowEvaluation] = useState(false)
   const [providers, setProviders] = useState([])
   const [selectedProvider, setSelectedProvider] = useState('deepseek')
@@ -129,6 +130,11 @@ function App() {
     setRbsLoggedIn(false)
     setRbsUsername('')
   }
+
+  const openEmailSource = useCallback((emailId) => {
+    setEmailToOpen(emailId)
+    setShowEmails(true)
+  }, [])
 
   const sendMessage = useCallback(async (text) => {
     const userMessage = text.trim()
@@ -392,6 +398,7 @@ function App() {
               key={message.id}
               message={message}
               onQuickReply={(text) => sendMessage(text)}
+              onOpenEmailSource={openEmailSource}
             />
           ))}
           
@@ -517,7 +524,14 @@ function App() {
       </div>
 
       {/* Modals */}
-      <EmailsModal isOpen={showEmails} onClose={() => setShowEmails(false)} />
+      <EmailsModal
+        isOpen={showEmails}
+        initialEmailId={emailToOpen}
+        onClose={() => {
+          setShowEmails(false)
+          setEmailToOpen(null)
+        }}
+      />
       <StatsModal isOpen={showStats} onClose={() => setShowStats(false)} />
       <HistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} />
       <EvaluationDashboard

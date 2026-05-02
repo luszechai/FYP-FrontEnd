@@ -5,7 +5,7 @@ import { Bot, User, Clock, FileText, FileUp, Calendar, Timer, DoorOpen, External
 import SourceLink from './SourceLink'
 import CitationBadge from './CitationBadge'
 
-function processContentWithCitations(children, sources) {
+function processContentWithCitations(children, sources, onOpenEmailSource) {
   if (!sources || sources.length === 0) return children
 
   return React.Children.map(children, (child) => {
@@ -25,7 +25,14 @@ function processContentWithCitations(children, sources) {
       }
 
       if (source) {
-        parts.push(<CitationBadge key={`cite-${match.index}`} number={num} source={source} />)
+        parts.push(
+          <CitationBadge
+            key={`cite-${match.index}`}
+            number={num}
+            source={source}
+            onOpenEmailSource={onOpenEmailSource}
+          />
+        )
       } else {
         parts.push(match[0])
       }
@@ -40,9 +47,9 @@ function processContentWithCitations(children, sources) {
   }).flat()
 }
 
-function withCitations(Component, sources) {
+function withCitations(Component, sources, onOpenEmailSource) {
   return ({ node, children, ...props }) => {
-    const processed = processContentWithCitations(children, sources)
+    const processed = processContentWithCitations(children, sources, onOpenEmailSource)
     return <Component {...props}>{processed}</Component>
   }
 }
@@ -102,14 +109,14 @@ const markdownComponents = {
   ),
 }
 
-function RichContent({ content, sources }) {
+function RichContent({ content, sources, onOpenEmailSource }) {
   const citationOverrides = sources.length > 0
     ? {
-        p: withCitations('p', sources),
-        li: withCitations('li', sources),
-        strong: withCitations('strong', sources),
-        em: withCitations('em', sources),
-        td: withCitations('td', sources),
+        p: withCitations('p', sources, onOpenEmailSource),
+        li: withCitations('li', sources, onOpenEmailSource),
+        strong: withCitations('strong', sources, onOpenEmailSource),
+        em: withCitations('em', sources, onOpenEmailSource),
+        td: withCitations('td', sources, onOpenEmailSource),
       }
     : {}
 
@@ -136,7 +143,7 @@ function StreamingContent({ content }) {
   )
 }
 
-const ChatMessage = React.memo(({ message, onQuickReply }) => {
+const ChatMessage = React.memo(({ message, onQuickReply, onOpenEmailSource }) => {
   const isUser = message.role === 'user'
   const isError = message.isError
   const sources = message.sources || []
@@ -238,7 +245,13 @@ const ChatMessage = React.memo(({ message, onQuickReply }) => {
             {message.isStreaming
               ? <StreamingContent content={message.content} />
               : mainContent
-                ? <RichContent content={mainContent} sources={sources} />
+                ? (
+                  <RichContent
+                    content={mainContent}
+                    sources={sources}
+                    onOpenEmailSource={onOpenEmailSource}
+                  />
+                )
                 : null
             }
           </div>
@@ -291,7 +304,12 @@ const ChatMessage = React.memo(({ message, onQuickReply }) => {
                   <span>Sources:</span>
                 </span>
                 {sources.slice(0, 5).map((source, idx) => (
-                  <SourceLink key={`source-${idx}-${source.id || idx}`} source={source} index={idx + 1} />
+                  <SourceLink
+                    key={`source-${idx}-${source.id || idx}`}
+                    source={source}
+                    index={idx + 1}
+                    onOpenEmailSource={onOpenEmailSource}
+                  />
                 ))}
                 {sources.length > 5 && (
                   <span className="text-gray-400">+{sources.length - 5} more</span>

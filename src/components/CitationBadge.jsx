@@ -1,14 +1,18 @@
 import React, { useState } from 'react'
 import SourcePopover from './SourcePopover'
+import { getEmailSourceId } from './SourceLink'
 
-const CitationBadge = ({ number, source }) => {
+const CitationBadge = ({ number, source, onOpenEmailSource }) => {
   const [hovered, setHovered] = useState(false)
+  const emailSourceId = getEmailSourceId(source)
 
   const handleClick = (e) => {
     e.preventDefault()
     e.stopPropagation()
 
-    if (source?.source_url) {
+    if (emailSourceId && onOpenEmailSource) {
+      onOpenEmailSource(emailSourceId)
+    } else if (source?.source_url) {
       window.open(source.source_url, '_blank', 'noopener,noreferrer')
     } else {
       alert(`Source URL not available for Document ${number}.`)

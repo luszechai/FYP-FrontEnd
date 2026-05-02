@@ -68,19 +68,36 @@ const BADGE_LABELS = {
 }
 
 const CATEGORY_KEYS = new Set(Object.keys(BADGE_LABELS))
+const CATEGORY_ORDER = TABS.map((tab) => tab.key)
 
-function getDisplayCategory(email, fallbackType = 'other') {
-  if (fallbackType !== 'all' && fallbackType !== 'other' && CATEGORY_KEYS.has(fallbackType)) {
-    return fallbackType
+function normalizeEmailTypes(values) {
+  const deduped = []
+  for (const value of values) {
+    if (!value || value === 'all' || value === 'other' || !CATEGORY_KEYS.has(value)) continue
+    if (!deduped.includes(value)) deduped.push(value)
   }
+  return deduped.sort((a, b) => CATEGORY_ORDER.indexOf(a) - CATEGORY_ORDER.indexOf(b))
+}
 
-  if (email?.type !== 'other' && CATEGORY_KEYS.has(email?.type)) {
-    return email.type
-  }
+function getEmailBadgeTypes(email, fallbackType = 'other') {
+  const rawTypes = Array.isArray(email?.types) ? email.types : []
+  const types = normalizeEmailTypes([
+    ...rawTypes,
+    email?.type,
+    fallbackType,
+  ])
+  return types.length > 0 ? types : ['other']
+}
 
+function getEmailIdentity(email) {
+  return email?.email_id || `${email?.subject || email?.name || 'untitled'}::${email?.date || ''}`
+}
+
+function getApplicationPeriodLabel(email) {
   const types = Array.isArray(email?.types) ? email.types : []
-  const validType = types.find((type) => type !== 'other' && CATEGORY_KEYS.has(type))
-  return validType || 'other'
+  const isJobsDigest = (email?.subject || '').includes('[Jobs & Events]')
+    || types.includes('Job Recruitment')
+  return isJobsDigest ? 'Application Deadlines' : 'Application Period'
 }
 
 const LINK_CATEGORIES = {
@@ -112,9 +129,7 @@ function isLikelyTechnicalMetadataUrl(url) {
 }
 
 function EmailListItem({ email, onClick }) {
-  const badgeType = getDisplayCategory(email, email.displayType)
-  const badgeStyle = BADGE_STYLES[badgeType] || BADGE_STYLES.other
-  const badgeLabel = BADGE_LABELS[badgeType] || BADGE_LABELS.other
+  const badgeTypes = getEmailBadgeTypes(email, email.displayType)
 
   return (
     <button
@@ -123,9 +138,14 @@ function EmailListItem({ email, onClick }) {
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border shrink-0 ${badgeStyle}`}>
-            {badgeLabel}
-          </span>
+          {badgeTypes.map((badgeType) => (
+            <span
+              key={badgeType}
+              className={`text-[11px] font-medium px-2 py-0.5 rounded-full border shrink-0 ${BADGE_STYLES[badgeType] || BADGE_STYLES.other}`}
+            >
+              {BADGE_LABELS[badgeType] || BADGE_LABELS.other}
+            </span>
+          ))}
           {email.date && (
             <span className="text-[11px] text-gray-400 shrink-0">{email.date}</span>
           )}
@@ -280,9 +300,7 @@ function OriginalHtmlViewer({ emailId }) {
 }
 
 function EmailDetailView({ email, onBack }) {
-  const badgeType = getDisplayCategory(email, email.displayType)
-  const badgeStyle = BADGE_STYLES[badgeType] || BADGE_STYLES.other
-  const badgeLabel = BADGE_LABELS[badgeType] || BADGE_LABELS.other
+  const badgeTypes = getEmailBadgeTypes(email, email.displayType)
 
   const showSubject = email.subject && email.name && email.subject !== email.name
     && !email.subject.includes('=?')
@@ -292,7 +310,7 @@ function EmailDetailView({ email, onBack }) {
   )
 
   const metaRows = [
-    { icon: Clock, label: 'Application Period', value: email.application_period },
+    { icon: Clock, label: getApplicationPeriodLabel(email), value: email.application_period },
     { icon: Clock, label: 'Event Period', value: email.event_period },
     { icon: Calendar, label: 'Time', value: email.time || email.event_time },
     { icon: DollarSign, label: 'Fees', value: email.fees },
@@ -318,9 +336,16 @@ function EmailDetailView({ email, onBack }) {
             <h3 className="text-base sm:text-lg font-bold text-gray-900 flex-1 min-w-0 leading-snug">
               {email.name || email.subject || 'Untitled'}
             </h3>
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full border shrink-0 ${badgeStyle}`}>
-              {badgeLabel}
-            </span>
+            <div className="flex flex-wrap justify-end gap-1.5 shrink-0">
+              {badgeTypes.map((badgeType) => (
+                <span
+                  key={badgeType}
+                  className={`text-xs font-medium px-2.5 py-1 rounded-full border ${BADGE_STYLES[badgeType] || BADGE_STYLES.other}`}
+                >
+                  {BADGE_LABELS[badgeType] || BADGE_LABELS.other}
+                </span>
+              ))}
+            </div>
           </div>
           {showSubject && (
             <p className="text-xs text-gray-500 mb-1">Subject: {email.subject}</p>
@@ -379,7 +404,7 @@ function EmailDetailView({ email, onBack }) {
   )
 }
 
-const EmailsModal = ({ isOpen, onClose }) => {
+const EmailsModal = ({ isOpen, onClose, initialEmailId = null }) => {
   const [emails, setEmails] = useState({})
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -392,15 +417,26 @@ const EmailsModal = ({ isOpen, onClose }) => {
       loadEmails()
       setSelectedEmail(null)
     }
-  }, [isOpen])
+  }, [isOpen, initialEmailId])
 
   const loadEmails = async () => {
     try {
       setLoading(true)
       setError(null)
       const data = await getEmails()
-      setEmails(data.emails || {})
+      const nextEmails = data.emails || {}
+      setEmails(nextEmails)
       setTotal(data.total || 0)
+      if (initialEmailId) {
+        const target = Object.values(nextEmails)
+          .flat()
+          .find((email) => (
+            email.email_id === initialEmailId
+            || email.source_id === initialEmailId
+            || getEmailIdentity(email) === initialEmailId
+          ))
+        if (target) setSelectedEmail(target)
+      }
     } catch (err) {
       console.error('Error loading emails:', err)
       setError('Failed to load emails. Please try again.')
@@ -412,9 +448,32 @@ const EmailsModal = ({ isOpen, onClose }) => {
   const getFilteredEmails = () => {
     let list = []
     if (activeTab === 'all') {
-      list = Object.entries(emails).flatMap(([type, listPart]) =>
-        listPart.map((e) => ({ ...e, displayType: getDisplayCategory(e, type) }))
-      )
+      const unique = new Map()
+      Object.entries(emails).forEach(([type, listPart]) => {
+        listPart.forEach((email) => {
+          const key = getEmailIdentity(email)
+          const existing = unique.get(key)
+          const displayType = getEmailBadgeTypes(email, type)[0]
+          if (!existing) {
+            unique.set(key, { ...email, displayType })
+            return
+          }
+          unique.set(key, {
+            ...existing,
+            ...email,
+            displayType: existing.displayType,
+            types: normalizeEmailTypes([
+              ...(Array.isArray(existing.types) ? existing.types : []),
+              ...(Array.isArray(email.types) ? email.types : []),
+              existing.type,
+              email.type,
+              existing.displayType,
+              displayType,
+            ]),
+          })
+        })
+      })
+      list = Array.from(unique.values())
     } else {
       list = (emails[activeTab] || []).map((e) => ({ ...e, displayType: activeTab }))
     }
@@ -422,13 +481,20 @@ const EmailsModal = ({ isOpen, onClose }) => {
   }
 
   const getTabCount = (key) => {
-    if (key === 'all') return total
+    if (key === 'all') {
+      const unique = new Set()
+      Object.values(emails).forEach((listPart) => {
+        listPart.forEach((email) => unique.add(getEmailIdentity(email)))
+      })
+      return unique.size || total
+    }
     return (emails[key] || []).length
   }
 
   if (!isOpen) return null
 
   const filtered = getFilteredEmails()
+  const uniqueTotal = getTabCount('all')
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto">
@@ -437,9 +503,9 @@ const EmailsModal = ({ isOpen, onClose }) => {
         <div className="shrink-0 bg-white border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <Mail className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 shrink-0" />
-            <h2 className="text-lg sm:text-2xl font-bold text-gray-900">Fetched Emails</h2>
-            {total > 0 && (
-              <span className="text-xs sm:text-sm text-gray-500">({total})</span>
+            <h2 className="text-lg sm:text-2xl font-bold text-gray-900">Emails</h2>
+            {uniqueTotal > 0 && (
+              <span className="text-xs sm:text-sm text-gray-500">({uniqueTotal})</span>
             )}
           </div>
           <button
