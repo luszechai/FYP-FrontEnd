@@ -67,6 +67,22 @@ const BADGE_LABELS = {
   other: 'Other',
 }
 
+const CATEGORY_KEYS = new Set(Object.keys(BADGE_LABELS))
+
+function getDisplayCategory(email, fallbackType = 'other') {
+  if (fallbackType !== 'all' && fallbackType !== 'other' && CATEGORY_KEYS.has(fallbackType)) {
+    return fallbackType
+  }
+
+  if (email?.type !== 'other' && CATEGORY_KEYS.has(email?.type)) {
+    return email.type
+  }
+
+  const types = Array.isArray(email?.types) ? email.types : []
+  const validType = types.find((type) => type !== 'other' && CATEGORY_KEYS.has(type))
+  return validType || 'other'
+}
+
 const LINK_CATEGORIES = {
   enrollment: { label: 'Enrollment / Registration', icon: ClipboardList },
   info: { label: 'Information', icon: Globe },
@@ -96,8 +112,9 @@ function isLikelyTechnicalMetadataUrl(url) {
 }
 
 function EmailListItem({ email, onClick }) {
-  const badgeStyle = BADGE_STYLES[email.type] || BADGE_STYLES.other
-  const badgeLabel = BADGE_LABELS[email.type] || BADGE_LABELS.other
+  const badgeType = getDisplayCategory(email, email.displayType)
+  const badgeStyle = BADGE_STYLES[badgeType] || BADGE_STYLES.other
+  const badgeLabel = BADGE_LABELS[badgeType] || BADGE_LABELS.other
 
   return (
     <button
@@ -263,8 +280,9 @@ function OriginalHtmlViewer({ emailId }) {
 }
 
 function EmailDetailView({ email, onBack }) {
-  const badgeStyle = BADGE_STYLES[email.type] || BADGE_STYLES.other
-  const badgeLabel = BADGE_LABELS[email.type] || BADGE_LABELS.other
+  const badgeType = getDisplayCategory(email, email.displayType)
+  const badgeStyle = BADGE_STYLES[badgeType] || BADGE_STYLES.other
+  const badgeLabel = BADGE_LABELS[badgeType] || BADGE_LABELS.other
 
   const showSubject = email.subject && email.name && email.subject !== email.name
     && !email.subject.includes('=?')
@@ -395,10 +413,10 @@ const EmailsModal = ({ isOpen, onClose }) => {
     let list = []
     if (activeTab === 'all') {
       list = Object.entries(emails).flatMap(([type, listPart]) =>
-        listPart.map((e) => ({ ...e, type: e.type || type }))
+        listPart.map((e) => ({ ...e, displayType: getDisplayCategory(e, type) }))
       )
     } else {
-      list = (emails[activeTab] || []).map((e) => ({ ...e, type: e.type || activeTab }))
+      list = (emails[activeTab] || []).map((e) => ({ ...e, displayType: activeTab }))
     }
     return list.sort((a, b) => getEmailSortTimestamp(b) - getEmailSortTimestamp(a))
   }
