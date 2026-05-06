@@ -27,9 +27,7 @@ const SourceLink = ({ source, index, onOpenEmailSource }) => {
     } else if (source.source_url) {
       window.open(source.source_url, '_blank', 'noopener,noreferrer')
     } else {
-      alert(
-        `Source URL not available for ${source.source_name || `Document ${index}`}.\n\nThis might mean:\n- The source document doesn't have a URL in its metadata\n- The URL needs to be configured in the backend\n\nSource info: ${JSON.stringify(source, null, 2)}`
-      )
+      console.warn('Source URL not available', { source, index })
     }
   }
 

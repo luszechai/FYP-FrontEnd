@@ -15,7 +15,7 @@ const CitationBadge = ({ number, source, onOpenEmailSource }) => {
     } else if (source?.source_url) {
       window.open(source.source_url, '_blank', 'noopener,noreferrer')
     } else {
-      alert(`Source URL not available for Document ${number}.`)
+      console.warn('Source URL not available', { source, number })
     }
   }
 

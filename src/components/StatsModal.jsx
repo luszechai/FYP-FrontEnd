@@ -5,6 +5,8 @@ import { getStats, getEvaluationMethods } from '../services/api'
 const StatsModal = ({ isOpen, onClose }) => {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [lastFetchedAt, setLastFetchedAt] = useState(null)
+  const [lastError, setLastError] = useState(null)
   const [evaluationMethod, setEvaluationMethod] = useState('max_similarity')
   const [threshold, setThreshold] = useState(0.5)
   const [evaluationMethods, setEvaluationMethods] = useState({})
@@ -36,10 +38,14 @@ const StatsModal = ({ isOpen, onClose }) => {
   const loadStats = async () => {
     try {
       setLoading(true)
+      setLastError(null)
       const data = await getStats(evaluationMethod, threshold)
       setStats(data)
+      setLastFetchedAt(new Date())
     } catch (error) {
       console.error('Error loading stats:', error)
+      const msg = error?.response?.data?.detail || error?.message || 'Failed to load statistics.'
+      setLastError(msg)
     } finally {
       setLoading(false)
     }
@@ -134,72 +140,138 @@ const StatsModal = ({ isOpen, onClose }) => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
               <p className="mt-4 text-gray-500">Loading statistics...</p>
             </div>
-          ) : stats && stats.total_queries > 0 ? (
+          ) : (
             <div className="space-y-6">
-              {/* Overview Cards */}
+              {/* Diagnostic header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="text-sm text-gray-600">
+                  <span className="font-medium">Fetch</span>
+                  <span className="ml-2">
+                    {lastFetchedAt ? `Last fetched at ${lastFetchedAt.toLocaleString()}` : 'Not fetched yet'}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500">
+                  method=<span className="font-mono">{evaluationMethod}</span> threshold=<span className="font-mono">{threshold}</span>
+                </div>
+              </div>
+              {lastError && (
+                <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+                  {lastError}
+                </div>
+              )}
+
+              {/* KPI cards (always render, even when total_queries==0) */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-blue-50 rounded-lg p-4">
                   <div className="flex items-center space-x-2 mb-2">
                     <Target className="w-5 h-5 text-blue-600" />
-                    <span className="text-sm font-medium text-gray-600">Total Queries</span>
+                    <span className="text-sm font-medium text-gray-600">消息数</span>
                   </div>
-                  <p className="text-2xl font-bold text-blue-600">{stats.total_queries}</p>
-                </div>
-
-                <div className="bg-green-50 rounded-lg p-4">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <TrendingUp className="w-5 h-5 text-green-600" />
-                    <span className="text-sm font-medium text-gray-600">Hit Rate</span>
-                  </div>
-                  <p className="text-2xl font-bold text-green-600">{stats.hit_rate.toFixed(1)}%</p>
+                  <p className="text-2xl font-bold text-blue-600">{stats?.total_queries || 0}</p>
                 </div>
 
                 <div className="bg-purple-50 rounded-lg p-4">
                   <div className="flex items-center space-x-2 mb-2">
                     <Clock className="w-5 h-5 text-purple-600" />
-                    <span className="text-sm font-medium text-gray-600">Avg Response</span>
+                    <span className="text-sm font-medium text-gray-600">端到端延迟 P95</span>
                   </div>
-                  <p className="text-2xl font-bold text-purple-600">{stats.avg_response_time.toFixed(2)}s</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {((stats?.latency_p95 ?? 0)).toFixed(2)}s
+                  </p>
+                </div>
+
+                <div className="bg-green-50 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <TrendingUp className="w-5 h-5 text-green-600" />
+                    <span className="text-sm font-medium text-gray-600">有引用回答占比</span>
+                  </div>
+                  <p className="text-2xl font-bold text-green-600">
+                    {((stats?.cited_answer_rate ?? 0)).toFixed(1)}%
+                  </p>
                 </div>
 
                 <div className="bg-orange-50 rounded-lg p-4">
                   <div className="flex items-center space-x-2 mb-2">
                     <BarChart3 className="w-5 h-5 text-orange-600" />
-                    <span className="text-sm font-medium text-gray-600">Avg Similarity</span>
+                    <span className="text-sm font-medium text-gray-600">平均引用数</span>
                   </div>
-                  <p className="text-2xl font-bold text-orange-600">{stats.avg_similarity.toFixed(3)}</p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {((stats?.avg_citations ?? 0)).toFixed(2)}
+                  </p>
                 </div>
               </div>
 
-              {/* Recent Queries */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Recent Queries</h3>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {stats.metrics.slice(-10).reverse().map((metric, index) => (
-                    <div key={index} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900">{metric.query}</p>
-                          <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                            <span>Category: {metric.category}</span>
-                            <span>Time: {metric.response_time.toFixed(2)}s</span>
-                            <span>Docs: {metric.num_docs}</span>
-                            <span className={`px-2 py-0.5 rounded ${metric.hit ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                              {metric.hit ? 'Hit' : 'Miss'}
-                            </span>
+              {/* Time breakdown */}
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-800 mb-3">耗时拆分（retrieval vs generation）</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                  <div className="bg-white rounded-lg border border-gray-200 p-3">
+                    <p className="text-gray-500 mb-1">Retrieval</p>
+                    <p className="font-semibold text-gray-900">
+                      avg {(((stats?.time_breakdown?.retrieval?.avg) ?? 0)).toFixed(2)}s · p95 {(((stats?.time_breakdown?.retrieval?.p95) ?? 0)).toFixed(2)}s
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-lg border border-gray-200 p-3">
+                    <p className="text-gray-500 mb-1">Generation</p>
+                    <p className="font-semibold text-gray-900">
+                      avg {(((stats?.time_breakdown?.generation?.avg) ?? 0)).toFixed(2)}s · p95 {(((stats?.time_breakdown?.generation?.p95) ?? 0)).toFixed(2)}s
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-lg border border-gray-200 p-3">
+                    <p className="text-gray-500 mb-1">End-to-end</p>
+                    <p className="font-semibold text-gray-900">
+                      avg {(((stats?.time_breakdown?.end_to_end?.avg) ?? 0)).toFixed(2)}s · p95 {(((stats?.time_breakdown?.end_to_end?.p95) ?? 0)).toFixed(2)}s
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-3 text-xs text-gray-500">
+                  额外：Hit Rate（{evaluationMethod}）= {((stats?.hit_rate ?? 0)).toFixed(1)}% · Avg similarity = {((stats?.avg_similarity ?? 0)).toFixed(3)}
+                </p>
+              </div>
+
+              {/* Empty hint */}
+              {(!stats || (stats.total_queries || 0) === 0) && (
+                <div className="text-center py-6">
+                  <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-700 font-medium">还没有数据</p>
+                  <p className="text-sm text-gray-500 mt-1">从聊天窗口走 streaming 发 1 条消息后，这里会立刻出现 Session KPI。</p>
+                </div>
+              )}
+
+              {/* Recent queries */}
+              {stats?.metrics?.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">最近请求</h3>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {stats.metrics.slice(-10).reverse().map((metric, index) => (
+                      <div key={metric.id || index} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{metric.query}</p>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
+                              <span>Category: {metric.category}</span>
+                              <span>Time: {(metric.response_time ?? 0).toFixed(2)}s</span>
+                              <span>Docs: {metric.num_docs ?? 0}</span>
+                              <span>Cites: {metric.num_cited_sources ?? 0}</span>
+                              <span className={`px-2 py-0.5 rounded ${metric.cited_answer ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'}`}>
+                                {metric.cited_answer ? 'Cited' : 'No cite'}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded ${metric.hit_by_method ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {metric.hit_by_method ? 'Hit' : 'Miss'}
+                              </span>
+                              {metric.status && metric.status !== 'success' && (
+                                <span className="px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">
+                                  {metric.status}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <BarChart3 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No statistics available yet.</p>
-              <p className="text-sm text-gray-400 mt-2">Start asking questions to see statistics.</p>
+              )}
             </div>
           )}
         </div>
