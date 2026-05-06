@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import SourcePopover from './SourcePopover'
-import { getEmailSourceId } from './SourceLink'
+import { getEmailSourceId } from './sourceUtils'
 
 const CitationBadge = ({ number, source, onOpenEmailSource }) => {
   const [hovered, setHovered] = useState(false)

@@ -1,7 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, Loader2, Mail, Search } from 'lucide-react'
+import {
+  ArrowLeft,
+  Loader2,
+  Mail,
+  Search,
+  Inbox,
+  MoreVertical,
+  Trash2,
+} from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { getEmailHtml, getEmails } from '../services/api'
 
@@ -16,16 +24,6 @@ const TABS = [
   { key: 'workshop', label: 'Workshop' },
 ]
 
-const BADGE_STYLES = {
-  scholarship: 'bg-blue-100 text-blue-700 border-blue-200',
-  events: 'bg-green-100 text-green-700 border-green-200',
-  recruitment: 'bg-orange-100 text-orange-700 border-orange-200',
-  'Member Recruitment': 'bg-amber-100 text-amber-700 border-amber-200',
-  'Job Recruitment': 'bg-orange-100 text-orange-700 border-orange-200',
-  workshop: 'bg-violet-100 text-violet-700 border-violet-200',
-  other: 'bg-gray-100 text-gray-600 border-gray-200',
-}
-
 const BADGE_LABELS = {
   scholarship: 'Scholarship',
   events: 'Events',
@@ -34,6 +32,20 @@ const BADGE_LABELS = {
   'Job Recruitment': 'Job Recruitment',
   workshop: 'Workshop',
   other: 'Other',
+}
+
+const BADGE_STYLES = {
+  scholarship: 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200',
+  events: 'bg-sky-100 text-sky-700 ring-1 ring-sky-200',
+  workshop: 'bg-violet-100 text-violet-700 ring-1 ring-violet-200',
+  'Job Recruitment': 'bg-amber-100 text-amber-800 ring-1 ring-amber-200',
+  'Member Recruitment': 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200',
+  recruitment: 'bg-orange-100 text-orange-800 ring-1 ring-orange-200',
+  other: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200',
+}
+
+function getBadgeClass(type) {
+  return BADGE_STYLES[type] || BADGE_STYLES.other
 }
 
 const CATEGORY_KEYS = new Set(Object.keys(BADGE_LABELS))
@@ -100,46 +112,6 @@ function useIsDesktop() {
   return isDesktop
 }
 
-function EmailListItem({ email, isSelected, onClick }) {
-  const badgeTypes = getEmailBadgeTypes(email, email.displayType)
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        'w-full text-left border rounded-xl px-4 py-3 transition-all flex items-start gap-3 group',
-        isSelected
-          ? 'border-blue-300 bg-blue-50/60 shadow-sm'
-          : 'border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300',
-      ].join(' ')}
-      aria-current={isSelected ? 'true' : 'false'}
-    >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1 flex-wrap">
-          {badgeTypes.map((t) => (
-            <span
-              key={t}
-              className={`text-[11px] font-medium px-2 py-0.5 rounded-full border shrink-0 ${
-                BADGE_STYLES[t] || BADGE_STYLES.other
-              }`}
-            >
-              {BADGE_LABELS[t] || BADGE_LABELS.other}
-            </span>
-          ))}
-          {email.date && <span className="text-[11px] text-gray-400 shrink-0">{email.date}</span>}
-        </div>
-        <h3 className="text-sm font-semibold text-gray-900 truncate">{email.name || email.subject || 'Untitled'}</h3>
-        {(email.introduction || email.details) && (
-          <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">{email.introduction || email.details}</p>
-        )}
-      </div>
-      <span className="text-xs text-gray-300 group-hover:text-gray-500 transition-colors mt-1" aria-hidden="true">
-        ↵
-      </span>
-    </button>
-  )
-}
-
 function OriginalHtmlViewer({ emailId }) {
   const [html, setHtml] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -173,7 +145,9 @@ function OriginalHtmlViewer({ emailId }) {
     }
   }
 
-  const renderedHtml = html ? `<base href="${API_BASE_URL}"><style>body{margin:12px;font-family:sans-serif;}</style>${html}` : ''
+  const renderedHtml = html
+    ? `<base href="${API_BASE_URL}"><style>body{margin:12px;font-family:sans-serif;}</style>${html}`
+    : ''
 
   if (loading) {
     return (
@@ -200,67 +174,148 @@ function OriginalHtmlViewer({ emailId }) {
   )
 }
 
+// --- Inbox List Item (reference style) ---
+function EmailListItem({ email, isSelected, onClick }) {
+  const badgeTypes = getEmailBadgeTypes(email, email.displayType)
+  const date = email.date || ''
+  const badgeType = badgeTypes[0] || 'other'
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full text-left p-4 border-b border-slate-100 transition-all ${
+        isSelected
+          ? 'bg-indigo-50/50 ring-1 ring-inset ring-indigo-200'
+          : 'hover:bg-slate-50'
+      }`}
+    >
+      <div className="flex justify-between items-center mb-1">
+        <span
+          className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${getBadgeClass(badgeType)}`}
+          title={BADGE_LABELS[badgeType] || badgeType}
+        >
+          {BADGE_LABELS[badgeType] || badgeType}
+        </span>
+        <span className="text-[10px] font-bold text-slate-400">{date}</span>
+      </div>
+      <h4 className="text-sm font-bold text-slate-800 line-clamp-1 mb-1">
+        {email.name || email.subject || 'Untitled'}
+      </h4>
+      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+        {email.introduction || email.details || 'No preview available'}
+      </p>
+    </button>
+  )
+}
+
+// --- Reading Pane (reference style) ---
 function EmailDetail({ email, onBack }) {
   const badgeTypes = getEmailBadgeTypes(email, email.displayType)
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="shrink-0 border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
+      <div className="shrink-0 border-b border-slate-200 px-4 sm:px-8 py-3 flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-2 text-sm text-gray-700 hover:text-blue-700 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors"
+          className="flex items-center gap-2 text-sm text-slate-700 hover:text-indigo-700 hover:bg-indigo-50 px-2 py-1.5 rounded-lg transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </button>
+        <div className="flex gap-2">
+          <button
+            onClick={onBack}
+            className="p-2 text-slate-400 hover:text-red-600 border border-slate-200 rounded-lg hover:bg-red-50 transition-colors"
+            title="Go back"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-5">
-        <div>
-          <div className="flex items-start gap-2 mb-2">
-            <h2 className="text-base sm:text-lg font-bold text-gray-900 flex-1 min-w-0 leading-snug">
-              {email.name || email.subject || 'Untitled'}
-            </h2>
-            <div className="flex flex-wrap justify-end gap-1.5 shrink-0">
-              {badgeTypes.map((t) => (
-                <span
-                  key={t}
-                  className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
-                    BADGE_STYLES[t] || BADGE_STYLES.other
-                  }`}
-                >
-                  {BADGE_LABELS[t] || BADGE_LABELS.other}
-                </span>
-              ))}
+      <div className="flex-1 min-h-0 overflow-y-auto py-12 px-8 space-y-5">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-sm">
+              {email.sender?.[0] || 'S'}
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                {badgeTypes.map((t) => (
+                  <span
+                    key={t}
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${getBadgeClass(t)}`}
+                    title={BADGE_LABELS[t] || t}
+                  >
+                    {BADGE_LABELS[t] || t}
+                  </span>
+                ))}
+                <span className="font-bold text-slate-900">Office</span>
+              </div>
+              {email.date && (
+                <p className="text-xs text-slate-500 font-medium">
+                  To: student-portal@sfu.ca
+                </p>
+              )}
             </div>
           </div>
-          {email.date && <p className="text-xs text-gray-400">{email.date}</p>}
         </div>
 
-        {email.introduction && <p className="text-sm text-gray-700 leading-relaxed">{email.introduction}</p>}
-        {email.details && <p className="text-sm text-gray-700 leading-relaxed">{email.details}</p>}
+        <h1 className="text-2xl font-bold text-slate-900 mb-6">
+          {email.name || email.subject || 'Untitled'}
+        </h1>
+
+        <div className="prose prose-slate max-w-none space-y-4 text-slate-700 text-sm leading-relaxed">
+          <p>Dear Student,</p>
+          <p>{email.introduction || email.details || 'No content available.'}</p>
+          {email.details && email.introduction && (
+            <p>{email.details}</p>
+          )}
+          {badgeTypes.includes('events') || badgeTypes.includes('workshop') ? (
+            <div className="my-8 p-6 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+              <h5 className="text-xs font-bold text-slate-800 mb-3 uppercase tracking-widest">
+                Event Details
+              </h5>
+              <p className="text-slate-600">
+                Join us for this upcoming event. Check the original email for location and time.
+              </p>
+            </div>
+          ) : null}
+        </div>
 
         {email.has_html && email.email_id ? (
-          <OriginalHtmlViewer emailId={email.email_id} />
+          <div className="mt-6">
+            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+              Original Email
+            </h4>
+            <OriginalHtmlViewer emailId={email.email_id} />
+          </div>
         ) : email.content ? (
-          <div>
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Full Email Content</h4>
-            <div className="bg-white border border-gray-200 rounded-xl p-4 max-h-[520px] overflow-y-auto text-sm text-gray-800 [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-50 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_td]:border [&_td]:border-gray-200 [&_td]:px-2 [&_td]:py-1 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_a]:text-blue-600 [&_a]:underline">
+          <div className="mt-6">
+            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+              Full Email Content
+            </h4>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 max-h-[520px] overflow-y-auto text-sm text-slate-800 [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-slate-300 [&_th]:bg-slate-50 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_td]:border [&_td]:border-slate-200 [&_td]:px-2 [&_td]:py-1 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_a]:text-indigo-600 [&_a]:underline">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {decodeHtmlEntities(getEmailContentBodyOnly(email.content))}
               </ReactMarkdown>
             </div>
           </div>
-        ) : (
-          <p className="text-sm text-gray-500">No content available.</p>
-        )}
+        ) : null}
+
+        <p className="text-slate-600">
+          Best Regards,
+          <br />
+          <span className="font-bold">SFU Global Services Team</span>
+        </p>
       </div>
     </div>
   )
 }
 
-export default function EmailsPage() {
+export default function EmailsPage({ embedded = false, selectedId: selectedIdProp = '', onSelectEmail, onRequestBack }) {
   const navigate = useNavigate()
   const { emailId: emailIdFromPath } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -274,7 +329,7 @@ export default function EmailsPage() {
   const activeTab = searchParams.get('tab') || 'all'
   const q = searchParams.get('q') || ''
   const openFromQuery = searchParams.get('open') || ''
-  const selectedId = emailIdFromPath || openFromQuery || ''
+  const selectedId = embedded ? selectedIdProp || '' : emailIdFromPath || openFromQuery || ''
 
   useEffect(() => {
     const load = async () => {
@@ -329,6 +384,18 @@ export default function EmailsPage() {
     return list.sort((a, b) => getEmailSortTimestamp(b) - getEmailSortTimestamp(a))
   }, [emails, activeTab])
 
+  useEffect(() => {
+    if (!embedded) return
+    if (!selectedIdProp) return
+    const exists = mergedList.some(
+      (e) =>
+        e.email_id === selectedIdProp ||
+        e.source_id === selectedIdProp ||
+        getEmailIdentity(e) === selectedIdProp,
+    )
+    if (!exists) onSelectEmail?.('')
+  }, [embedded, selectedIdProp, mergedList, onSelectEmail])
+
   const filteredList = useMemo(() => {
     const query = q.trim().toLowerCase()
     if (!query) return mergedList
@@ -359,8 +426,8 @@ export default function EmailsPage() {
   }, [mergedList, selectedId])
 
   useEffect(() => {
+    if (embedded) return
     if (!openFromQuery) return
-    // normalize: once we successfully found, migrate to path on desktop for a cleaner URL
     if (!selectedEmail) return
     if (emailIdFromPath) return
     navigate(`/emails/${encodeURIComponent(selectedEmail.email_id || openFromQuery)}?${searchParams.toString()}`, {
@@ -375,7 +442,7 @@ export default function EmailsPage() {
     else next.set('tab', tabKey)
     next.delete('open')
     setSearchParams(next, { replace: true })
-    if (!isDesktop) navigate('/emails?' + next.toString(), { replace: true })
+    if (!embedded && !isDesktop) navigate('/emails?' + next.toString(), { replace: true })
   }
 
   const setQuery = (value) => {
@@ -388,6 +455,10 @@ export default function EmailsPage() {
   const openEmail = (email) => {
     const id = email?.email_id || email?.source_id || getEmailIdentity(email)
     if (!id) return
+    if (embedded) {
+      onSelectEmail?.(id)
+      return
+    }
     const next = new URLSearchParams(searchParams)
     next.delete('open')
     const url = `/emails/${encodeURIComponent(id)}?${next.toString()}`
@@ -395,6 +466,10 @@ export default function EmailsPage() {
   }
 
   const backToList = () => {
+    if (embedded) {
+      onSelectEmail?.('')
+      return
+    }
     const next = new URLSearchParams(searchParams)
     next.delete('open')
     navigate(`/emails?${next.toString()}`, { replace: false })
@@ -411,52 +486,57 @@ export default function EmailsPage() {
     return (emails[key] || []).length
   }
 
-  const showDetailOnlyMobile = !isDesktop && !!emailIdFromPath && selectedEmail
+  const showDetailOnlyMobile = embedded ? false : !isDesktop && !!emailIdFromPath && selectedEmail
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Mail className="w-5 h-5 text-blue-600 shrink-0" />
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">Emails</h1>
-            {uniqueAllCount > 0 && <span className="text-sm text-gray-500">({uniqueAllCount})</span>}
+    <div className={embedded ? 'h-full bg-[#F8FAFC]' : 'min-h-screen bg-[#F8FAFC]'}>
+      {!embedded && (
+        <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Inbox className="w-5 h-5 text-indigo-600 shrink-0" />
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900 truncate">Inbox</h1>
+              {uniqueAllCount > 0 && <span className="text-sm text-slate-500">({uniqueAllCount})</span>}
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="text-sm font-medium text-slate-700 hover:text-indigo-700 hover:bg-indigo-50 px-3 py-2 rounded-lg transition-colors"
+            >
+              Back to Chat
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors"
-          >
-            Back to Chat
-          </button>
-        </div>
-      </header>
+        </header>
+      )}
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
+      <main className={embedded ? 'h-full p-4' : 'max-w-6xl mx-auto px-4 sm:px-6 py-4'}>
         {showDetailOnlyMobile ? (
-          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden min-h-[70vh]">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden min-h-[70vh]">
             <EmailDetail email={selectedEmail} onBack={backToList} />
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)] gap-4">
-            <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden min-h-[70vh] flex flex-col">
-              <div className="shrink-0 border-b border-gray-200 px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      value={q}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Search emails…"
-                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
-                      aria-label="Search emails"
-                    />
-                  </div>
+          <div
+            className={`flex bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden ${
+              embedded ? 'h-full' : 'h-[calc(100vh-8rem)]'
+            }`}
+          >
+            {/* Inbox Sidebar */}
+            <div className="w-80 border-r border-slate-200 bg-white flex flex-col shrink-0">
+              <div className="p-4 border-b border-slate-100">
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
+                  <Search size={14} className="text-slate-400 shrink-0" />
+                  <input
+                    value={q}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search inbox..."
+                    className="bg-transparent border-none focus:ring-0 text-xs w-full font-medium outline-none"
+                  />
                 </div>
               </div>
 
+              {/* Tabs */}
               {!loading && !error && total > 0 && (
-                <div className="shrink-0 border-b border-gray-200 px-2">
+                <div className="shrink-0 border-b border-slate-100 px-2">
                   <div className="flex gap-1 overflow-x-auto -mb-px">
                     {TABS.map((tab) => {
                       const count = getTabCount(tab.key)
@@ -466,19 +546,17 @@ export default function EmailsPage() {
                           key={tab.key}
                           type="button"
                           onClick={() => setTab(tab.key)}
-                          className={[
-                            'flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors',
+                          className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 whitespace-nowrap transition-colors ${
                             isActive
-                              ? 'border-blue-600 text-blue-700'
-                              : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300',
-                          ].join(' ')}
+                              ? 'border-indigo-600 text-indigo-700'
+                              : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+                          }`}
                         >
                           {tab.label}
                           <span
-                            className={[
-                              'text-xs px-1.5 py-0.5 rounded-full',
-                              isActive ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600',
-                            ].join(' ')}
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                              isActive ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'
+                            }`}
                           >
                             {count}
                           </span>
@@ -489,39 +567,12 @@ export default function EmailsPage() {
                 </div>
               )}
 
-              <div
-                className="flex-1 overflow-y-auto p-3"
-                role="listbox"
-                aria-label="Email list"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (!filteredList.length) return
-                  const currentIdx = Math.max(
-                    0,
-                    filteredList.findIndex((it) => getEmailIdentity(it) === getEmailIdentity(selectedEmail)),
-                  )
-                  if (e.key === 'ArrowDown') {
-                    e.preventDefault()
-                    const next = filteredList[Math.min(filteredList.length - 1, currentIdx + 1)]
-                    if (next) openEmail(next)
-                  } else if (e.key === 'ArrowUp') {
-                    e.preventDefault()
-                    const prev = filteredList[Math.max(0, currentIdx - 1)]
-                    if (prev) openEmail(prev)
-                  } else if (e.key === 'Enter') {
-                    e.preventDefault()
-                    const it = filteredList[currentIdx]
-                    if (it) openEmail(it)
-                  } else if (e.key === 'Escape') {
-                    e.preventDefault()
-                    backToList()
-                  }
-                }}
-              >
+              {/* Email List */}
+              <div className="flex-1 overflow-y-auto" role="listbox" aria-label="Email list">
                 {loading ? (
                   <div className="text-center py-10">
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
-                    <p className="mt-3 text-sm text-gray-500">Loading emails…</p>
+                    <Loader2 className="w-6 h-6 animate-spin text-indigo-600 mx-auto" />
+                    <p className="mt-3 text-sm text-slate-500">Loading emails…</p>
                   </div>
                 ) : error ? (
                   <div className="text-center py-10">
@@ -529,16 +580,18 @@ export default function EmailsPage() {
                     <button
                       type="button"
                       onClick={() => window.location.reload()}
-                      className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                      className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors"
                     >
                       Retry
                     </button>
                   </div>
                 ) : filteredList.length > 0 ? (
-                  <div className="space-y-2">
+                  <div>
                     {filteredList.map((email) => {
                       const id = getEmailIdentity(email)
-                      const selected = selectedEmail ? getEmailIdentity(selectedEmail) === id : false
+                      const selected = selectedEmail
+                        ? getEmailIdentity(selectedEmail) === id
+                        : false
                       return (
                         <EmailListItem
                           key={id}
@@ -551,33 +604,45 @@ export default function EmailsPage() {
                   </div>
                 ) : (
                   <div className="text-center py-10">
-                    <Mail className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-sm text-gray-600">No emails found.</p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {activeTab === 'all' ? 'No emails have been fetched and ingested yet.' : `No ${activeTab} emails available.`}
+                    <Mail className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <p className="text-sm text-slate-600">No emails found.</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {activeTab === 'all'
+                        ? 'No emails have been fetched yet.'
+                        : `No ${activeTab} emails available.`}
                     </p>
                   </div>
                 )}
               </div>
-            </section>
+            </div>
 
-            <section className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden min-h-[70vh]">
+            {/* Reading Pane */}
+            <div className="flex-1 bg-white overflow-hidden">
               {selectedEmail ? (
                 <EmailDetail email={selectedEmail} onBack={backToList} />
               ) : (
-                <div className="h-full flex items-center justify-center text-center p-8">
-                  <div className="max-w-sm">
-                    <Mail className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-sm font-medium text-gray-700">Select an email</p>
-                    <p className="text-xs text-gray-500 mt-1">Choose one from the list to preview its details.</p>
+                <div className="h-full flex flex-col items-center justify-center text-slate-300 bg-white">
+                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
+                    <Inbox size={32} />
                   </div>
+                  <p className="text-sm font-medium tracking-tight text-slate-400">
+                    Select an email to begin reading
+                  </p>
+                  {embedded && (
+                    <button
+                      type="button"
+                      onClick={() => onRequestBack?.()}
+                      className="mt-4 text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-3 py-2 rounded-lg transition-colors"
+                    >
+                      Back
+                    </button>
+                  )}
                 </div>
               )}
-            </section>
+            </div>
           </div>
         )}
       </main>
     </div>
   )
 }
-
