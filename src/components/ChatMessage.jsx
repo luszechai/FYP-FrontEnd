@@ -130,6 +130,90 @@ function RichContent({ content, sources, onOpenEmailSource }) {
   )
 }
 
+// Ordered from most-specific to least-specific to avoid partial overlaps.
+const RBS_HIGHLIGHT_PATTERNS = [
+  // "Saturday, May 09, 2026" — weekday + full date
+  /\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:,\s+\d{4})?/gi,
+  // "May 09, 2026" / "January 1 2026"
+  /\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?/gi,
+  // "1 January 2026"
+  /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)(?:,?\s+\d{4})?/gi,
+  // ISO date: 2026-01-01
+  /\b\d{4}-\d{2}-\d{2}\b/g,
+  // Slash date: 01/01/2026
+  /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g,
+  // Time range: "9:00 AM - 11:00 AM", "9:00-11:00"
+  /\b\d{1,2}:\d{2}(?:\s?[AaPp][Mm])?(?:\s?[-–]\s?\d{1,2}:\d{2}(?:\s?[AaPp][Mm])?)?/g,
+  // Simple time with am/pm: "2pm", "9am-5pm"
+  /\b\d{1,2}\s?[AaPp][Mm](?:\s?[-–]\s?\d{1,2}(?::\d{2})?\s?[AaPp][Mm])?/g,
+  // Room label: "Room AQ 3149", "Rm. 101"
+  /\b(?:Room|Rm\.?)\s+[A-Z0-9][A-Za-z0-9 -]{1,15}/gi,
+  // Room code: "AQ 3149", "SRYE 2200", "WMC 3520"
+  /\b[A-Z]{2,4}\s?\d{3,4}[A-Za-z]?\b/g,
+]
+
+// Splits `text` into an array of strings and <strong> elements.
+function highlightRbsText(text) {
+  if (!text) return [text]
+
+  // Collect all non-overlapping match ranges in one pass.
+  const ranges = []
+  for (const pattern of RBS_HIGHLIGHT_PATTERNS) {
+    const re = new RegExp(pattern.source, pattern.flags)
+    let m
+    while ((m = re.exec(text)) !== null) {
+      const start = m.index
+      const end = m.index + m[0].length
+      const overlaps = ranges.some((r) => start < r.end && end > r.start)
+      if (!overlaps) ranges.push({ start, end })
+      if (!pattern.flags.includes('g')) break
+    }
+  }
+  ranges.sort((a, b) => a.start - b.start)
+
+  const parts = []
+  let cursor = 0
+  for (const { start, end } of ranges) {
+    if (start > cursor) parts.push(text.slice(cursor, start))
+    parts.push(
+      <strong key={start} className="font-semibold text-slate-900">
+        {text.slice(start, end)}
+      </strong>
+    )
+    cursor = end
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor))
+  return parts.length > 0 ? parts : [text]
+}
+
+// Wraps matched keywords in **...** for use inside markdown strings.
+// Uses the same range-based approach as highlightRbsText to avoid overlapping matches.
+function boldRbsKeywords(content) {
+  if (!content) return content
+
+  const ranges = []
+  for (const pattern of RBS_HIGHLIGHT_PATTERNS) {
+    const re = new RegExp(pattern.source, pattern.flags)
+    let m
+    while ((m = re.exec(content)) !== null) {
+      const start = m.index
+      const end = m.index + m[0].length
+      const overlaps = ranges.some((r) => start < r.end && end > r.start)
+      if (!overlaps) ranges.push({ start, end })
+      if (!pattern.flags.includes('g')) break
+    }
+  }
+  ranges.sort((a, b) => a.start - b.start)
+
+  // Apply substitutions right-to-left so earlier indices stay valid.
+  let result = content
+  for (let i = ranges.length - 1; i >= 0; i--) {
+    const { start, end } = ranges[i]
+    result = result.slice(0, start) + '**' + result.slice(start, end) + '**' + result.slice(end)
+  }
+  return result
+}
+
 function StreamingContent({ content }) {
   if (!content) {
     return <span className="inline-block w-2 h-4 bg-blue-500 rounded-sm animate-pulse" />
@@ -183,6 +267,7 @@ const ChatMessage = React.memo(({ message, onQuickReply, onOpenEmailSource }) =>
       }
     }
 
+    mainContent = boldRbsKeywords(mainContent)
   }
 
   return (
@@ -226,8 +311,8 @@ const ChatMessage = React.memo(({ message, onQuickReply, onOpenEmailSource }) =>
         </div>
 
         {!isUser && isRbs && suggestedFollowUps.length > 0 && onQuickReply && (
-          <div className="mt-3 w-full max-w-xl space-y-2">
-            <p className="text-xs font-medium text-slate-500">Suggested follow-up questions</p>
+          <div className="mt-4 w-full max-w-xl mx-auto space-y-2">
+            <p className="text-xs font-medium text-slate-500 text-center">Suggested follow-up questions</p>
             {suggestedFollowUps.map((label, idx) => {
               return (
                 <button
@@ -236,7 +321,7 @@ const ChatMessage = React.memo(({ message, onQuickReply, onOpenEmailSource }) =>
                   onClick={() => onQuickReply(label)}
                   className="group flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-50/40"
                 >
-                  <span className="pr-3">{label}</span>
+                  <span className="pr-3">{highlightRbsText(label)}</span>
                   <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400 transition-colors group-hover:text-indigo-500" />
                 </button>
               )
