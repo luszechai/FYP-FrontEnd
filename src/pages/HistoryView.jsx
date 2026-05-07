@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Bot, History, MessageSquarePlus, User } from 'lucide-react'
+import { Bot, History, MessageSquarePlus, Play, Trash2, User } from 'lucide-react'
 
 function formatTs(iso) {
   if (!iso) return ''
@@ -10,7 +10,12 @@ function formatTs(iso) {
   return new Date(ms).toLocaleString()
 }
 
-export default function HistoryView({ conversations = [], onStartNewConversation }) {
+export default function HistoryView({
+  conversations = [],
+  onStartNewConversation,
+  onResumeConversation,
+  onDeleteConversation,
+}) {
   const [selectedId, setSelectedId] = useState('')
 
   const selected = useMemo(() => {
@@ -56,14 +61,17 @@ export default function HistoryView({ conversations = [], onStartNewConversation
                     (last?.content && String(last.content).slice(0, 100)) ||
                     (Array.isArray(c.messages) ? `${c.messages.length} messages` : '')
                   return (
-                    <button
+                    <div
                       key={c.id}
-                      type="button"
-                      onClick={() => setSelectedId(c.id)}
                       className={`w-full text-left p-4 border-b border-slate-100 transition-all ${
                         isActive ? 'bg-indigo-50/50 ring-1 ring-inset ring-indigo-200' : 'hover:bg-slate-50'
                       }`}
                     >
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(c.id)}
+                        className="w-full text-left"
+                      >
                       <div className="flex items-center justify-between gap-3 mb-1">
                         <h4 className="text-sm font-bold text-slate-900 line-clamp-1">{c.title || 'Conversation'}</h4>
                         <span className="text-[10px] font-bold text-slate-400 shrink-0">
@@ -71,7 +79,29 @@ export default function HistoryView({ conversations = [], onStartNewConversation
                         </span>
                       </div>
                       <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{preview}</p>
-                    </button>
+                      </button>
+                      <div className="mt-3 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onResumeConversation?.(c.id)}
+                          className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                        >
+                          <Play className="w-3 h-3" />
+                          Resume
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onDeleteConversation?.(c.id)
+                            if (selectedId === c.id) setSelectedId('')
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-100 transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          Delete
+                        </button>
+                      </div>
+                    </div>
                   )
                 })}
               </div>
@@ -86,6 +116,27 @@ export default function HistoryView({ conversations = [], onStartNewConversation
                       <p className="text-xs text-slate-500 mt-1">
                         Created: {formatTs(selected.createdAt)} · Updated: {formatTs(selected.updatedAt)}
                       </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => onResumeConversation?.(selected.id)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                      >
+                        <Play className="w-3.5 h-3.5" />
+                        Resume chat
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onDeleteConversation?.(selected.id)
+                          setSelectedId('')
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Delete
+                      </button>
                     </div>
                   </div>
 

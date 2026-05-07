@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Bot, User, Clock, FileText, FileUp, Calendar, Timer, DoorOpen, ExternalLink } from 'lucide-react'
+import { Bot, User, Clock, FileText, FileUp, ChevronRight } from 'lucide-react'
 import SourceLink from './SourceLink'
 import CitationBadge from './CitationBadge'
 
@@ -185,38 +185,6 @@ const ChatMessage = React.memo(({ message, onQuickReply, onOpenEmailSource }) =>
 
   }
 
-  const categorizeFollowUp = (label) => {
-    const lower = label.toLowerCase()
-    if (/\b(book\b|booking|reserve|link|details|occupied|schedule)/.test(lower))
-      return 'action'
-    if (/\b(am|pm)\b/.test(lower) || /\d{1,2}:\d{2}/.test(lower) || /hour/.test(lower))
-      return 'time'
-    if (/\b(mon|tue|wed|thu|fri|sat|sun|tomorrow|today|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{4}-\d{2}-\d{2})\b/i.test(lower))
-      return 'date'
-    if (/\b(room\b|classroom|discussion|study|pod|lab)/.test(lower))
-      return 'room'
-    return 'default'
-  }
-
-  const followUpStyles = {
-    time:    'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-400',
-    date:    'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-400',
-    room:    'border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:border-purple-400',
-    action:  'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-400',
-    default: 'border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100 hover:border-gray-400',
-  }
-
-  const FollowUpIcon = ({ category }) => {
-    const cls = "w-3 h-3 mr-1 flex-shrink-0"
-    switch (category) {
-      case 'time':   return <Timer className={cls} />
-      case 'date':   return <Calendar className={cls} />
-      case 'room':   return <DoorOpen className={cls} />
-      case 'action': return <ExternalLink className={cls} />
-      default:       return null
-    }
-  }
-
   return (
     <div className={`flex items-start gap-2 sm:gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
       <div className={`p-1.5 sm:p-2 rounded-full shrink-0 ${isUser ? 'bg-indigo-600' : 'bg-blue-600'}`}>
@@ -258,18 +226,18 @@ const ChatMessage = React.memo(({ message, onQuickReply, onOpenEmailSource }) =>
         </div>
 
         {!isUser && isRbs && suggestedFollowUps.length > 0 && onQuickReply && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          <div className="mt-3 w-full max-w-xl space-y-2">
+            <p className="text-xs font-medium text-slate-500">Suggested follow-up questions</p>
             {suggestedFollowUps.map((label, idx) => {
-              const category = categorizeFollowUp(label)
               return (
                 <button
                   key={`${label}-${idx}`}
                   type="button"
                   onClick={() => onQuickReply(label)}
-                  className={`inline-flex items-center px-2.5 py-1 text-xs rounded-full border transition-colors ${followUpStyles[category]}`}
+                  className="group flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-50/40"
                 >
-                  <FollowUpIcon category={category} />
-                  {label}
+                  <span className="pr-3">{label}</span>
+                  <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400 transition-colors group-hover:text-indigo-500" />
                 </button>
               )
             })}

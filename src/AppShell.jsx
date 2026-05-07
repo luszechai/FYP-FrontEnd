@@ -3,14 +3,15 @@ import {
   BarChart3,
   CheckCircle2,
   ChevronDown,
-  Clock,
+  ChevronRight,
   FlaskConical,
   History,
   Inbox,
+  LogOut,
   Menu,
   MessageSquare,
   Plus,
-  User,
+  School,
   Zap,
 } from 'lucide-react'
 import ChatView from './ChatView'
@@ -21,28 +22,72 @@ import EvaluationDashboard from './components/evaluation/EvaluationDashboard'
 import RbsLoginModal from './components/RbsLoginModal'
 import { clearMemory, getEmails, getProviders, rbsLogout, rbsStatus } from './services/api'
 
-const NavItem = ({ icon: Icon, label, active, onClick, badge, collapsed = false }) => (
+const NavItem = ({
+  icon: Icon,
+  label,
+  active,
+  onClick,
+  badge,
+  collapsed = false,
+  rightIcon: RightIcon = null,
+  tone = 'default',
+}) => (
   <button
     type="button"
     onClick={onClick}
     className={`w-full group flex items-center ${collapsed ? 'justify-center px-2' : 'justify-between px-3'} py-2.5 rounded-lg transition-all duration-150 ${
-      active
+      tone === 'rbs-logged-in'
+        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+        : active
         ? 'bg-indigo-50 text-indigo-700'
         : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
     }`}
   >
     <div className={`flex items-center ${collapsed ? 'gap-0' : 'gap-3'}`}>
-      <Icon size={18} className={active ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'} />
-      {!collapsed && <span className={`text-sm font-medium ${active ? 'text-indigo-700' : ''}`}>{label}</span>}
+      <Icon
+        size={18}
+        className={
+          tone === 'rbs-logged-in'
+            ? 'text-emerald-600'
+            : active
+            ? 'text-indigo-600'
+            : 'text-slate-400 group-hover:text-slate-600'
+        }
+      />
+      {!collapsed && (
+        <span
+          className={`text-sm font-medium ${
+            tone === 'rbs-logged-in' ? 'text-emerald-800' : active ? 'text-indigo-700' : ''
+          }`}
+        >
+          {label}
+        </span>
+      )}
     </div>
-    {!collapsed && badge !== undefined && badge !== null && (
-      <span
-        className={`text-[10px] px-1.5 py-0.5 font-bold rounded ${
-          active ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'
-        }`}
-      >
-        {badge}
-      </span>
+    {!collapsed && (
+      <>
+        {badge !== undefined && badge !== null && (
+          <span
+            className={`text-[10px] px-1.5 py-0.5 font-bold rounded ${
+              active ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'
+            }`}
+          >
+            {badge}
+          </span>
+        )}
+        {RightIcon && (
+          <RightIcon
+            size={14}
+            className={
+              tone === 'rbs-logged-in'
+                ? 'text-rose-500'
+                : active
+                ? 'text-indigo-500'
+                : 'text-slate-400 group-hover:text-slate-600'
+            }
+          />
+        )}
+      </>
     )}
   </button>
 )
@@ -112,6 +157,33 @@ export default function AppShell() {
     return 'SFU Portal'
   }, [view])
 
+  const showCurrentConversationInSidebar = useMemo(() => {
+    // Show current chat in the list once assistant output starts.
+    return chatMessages.some((m) => m.role === 'assistant')
+  }, [chatMessages])
+
+  const sidebarConversations = useMemo(() => {
+    const firstUser = chatMessages.find((m) => m.role === 'user')?.content || 'Conversation'
+    const currentTitle = String(firstUser).slice(0, 60) || 'Conversation'
+    const current = {
+      id: conversationId,
+      title: currentTitle,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: chatMessages,
+      isCurrent: true,
+    }
+
+    const others = archivedConversations
+      .map((c) => ({ ...c, isCurrent: false }))
+
+    if (!showCurrentConversationInSidebar) return others
+
+    const hasCurrentInArchive = others.some((c) => c.id === conversationId)
+    // Preserve archive order; only append current chat if it is brand new.
+    return hasCurrentInArchive ? others : [...others, current]
+  }, [archivedConversations, chatMessages, conversationId, showCurrentConversationInSidebar])
+
   const openEmailFromChatSource = useCallback((emailId) => {
     const id = String(emailId || '').trim()
     if (!id) return
@@ -138,14 +210,26 @@ export default function AppShell() {
     if (hasAnything) {
       const firstUser = chatMessages.find((m) => m.role === 'user')?.content || 'Conversation'
       const title = String(firstUser).slice(0, 60) || 'Conversation'
+      const nowIso = new Date().toISOString()
       const archived = {
         id: conversationId,
         title,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: nowIso,
+        updatedAt: nowIso,
         messages: chatMessages,
       }
-      setArchivedConversations((prev) => [archived, ...prev].slice(0, 200))
+      setArchivedConversations((prev) => {
+        const existing = prev.find((c) => c.id === conversationId)
+        const merged = existing
+          ? {
+              ...existing,
+              ...archived,
+              createdAt: existing.createdAt || archived.createdAt,
+              updatedAt: nowIso,
+            }
+          : archived
+        return [merged, ...prev.filter((c) => c.id !== conversationId)].slice(0, 200)
+      })
     }
 
     // Always return to chat view when starting fresh
@@ -159,6 +243,25 @@ export default function AppShell() {
       // ignore
     }
   }, [chatMessages, conversationId])
+
+  const resumeConversation = useCallback((id) => {
+    const targetId = String(id || '')
+    if (!targetId) return
+    const convo = archivedConversations.find((c) => c.id === targetId)
+    if (!convo) return
+
+    setConversationId(convo.id || `conv_${Date.now()}`)
+    setChatMessages(Array.isArray(convo.messages) ? convo.messages : [])
+    setOpenEmailId('')
+    setView('chat')
+
+  }, [archivedConversations])
+
+  const deleteConversation = useCallback((id) => {
+    const targetId = String(id || '')
+    if (!targetId) return
+    setArchivedConversations((prev) => prev.filter((c) => c.id !== targetId))
+  }, [])
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] text-slate-900 overflow-hidden">
@@ -182,6 +285,31 @@ export default function AppShell() {
             onClick={() => setView('chat')}
             collapsed={!sidebarOpen}
           />
+          {sidebarOpen && sidebarConversations.length > 0 && (
+            <div className="pl-5 pr-2 pb-2 space-y-1">
+              {sidebarConversations.slice(0, 6).map((conv) => (
+                <button
+                  key={conv.id}
+                  type="button"
+                  onClick={() => {
+                    if (conv.id === conversationId) {
+                      setView('chat')
+                      return
+                    }
+                    resumeConversation(conv.id)
+                  }}
+                  className={`w-full text-left text-xs px-2 py-1.5 rounded-md transition-colors truncate ${
+                    view === 'chat' && conversationId === conv.id
+                      ? 'bg-indigo-50 text-indigo-700'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                  }`}
+                  title={conv.title || 'Conversation'}
+                >
+                  {conv.title || 'Conversation'}
+                </button>
+              ))}
+            </div>
+          )}
           <NavItem
             icon={Inbox}
             label="Email"
@@ -215,9 +343,11 @@ export default function AppShell() {
 
         <div className="p-3 border-t border-slate-100 space-y-1">
           <NavItem
-            icon={Clock}
+            icon={School}
             label={rbsLoggedIn ? `RBS: ${rbsUsername}` : 'RBS Login'}
             onClick={handleRbsClick}
+            rightIcon={rbsLoggedIn ? LogOut : ChevronRight}
+            tone={rbsLoggedIn ? 'rbs-logged-in' : 'default'}
             collapsed={!sidebarOpen}
           />
         </div>
@@ -300,6 +430,8 @@ export default function AppShell() {
             <HistoryView
               conversations={archivedConversations}
               onStartNewConversation={startNewConversation}
+              onResumeConversation={resumeConversation}
+              onDeleteConversation={deleteConversation}
             />
           )}
           {view === 'evaluation' && (
