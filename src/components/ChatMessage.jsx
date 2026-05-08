@@ -287,7 +287,7 @@ const ChatMessage = React.memo(({ message, onQuickReply, onOpenEmailSource }) =>
               ? 'bg-indigo-600 text-white rounded-tr-none'
               : isError
               ? 'bg-red-50 text-red-800 border border-red-200 rounded-tl-none'
-              : 'bg-white text-gray-900 rounded-tl-none'
+              : 'bg-slate-50 text-slate-900 border border-slate-200 ring-1 ring-inset ring-slate-200/60 rounded-tl-none'
           }`}
         >
           <div className={`prose prose-sm max-w-none break-words ${

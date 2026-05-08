@@ -9,7 +9,6 @@ import {
   Inbox,
   LogOut,
   Menu,
-  MessageSquare,
   Plus,
   School,
   Zap,
@@ -97,6 +96,7 @@ export default function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [openEmailId, setOpenEmailId] = useState('')
   const [showRbsLogin, setShowRbsLogin] = useState(false)
+  const [historySelectedId, setHistorySelectedId] = useState('')
 
   const [emailTotal, setEmailTotal] = useState(null)
   const [providers, setProviders] = useState([])
@@ -106,6 +106,7 @@ export default function AppShell() {
   const [rbsUsername, setRbsUsername] = useState('')
 
   const [conversationId, setConversationId] = useState(() => `conv_${Date.now()}`)
+  const [conversationCreatedAt, setConversationCreatedAt] = useState(() => new Date().toISOString())
   const [chatMessages, setChatMessages] = useState([])
   const [archivedConversations, setArchivedConversations] = useState(() => {
     try {
@@ -157,32 +158,28 @@ export default function AppShell() {
     return 'SFU Portal'
   }, [view])
 
-  const showCurrentConversationInSidebar = useMemo(() => {
-    // Show current chat in the list once assistant output starts.
-    return chatMessages.some((m) => m.role === 'assistant')
-  }, [chatMessages])
-
-  const sidebarConversations = useMemo(() => {
-    const firstUser = chatMessages.find((m) => m.role === 'user')?.content || 'Conversation'
-    const currentTitle = String(firstUser).slice(0, 60) || 'Conversation'
+  const historyConversations = useMemo(() => {
+    const firstUser = chatMessages.find((m) => m.role === 'user')?.content || 'New Chat'
+    const currentTitle = String(firstUser).slice(0, 60) || 'New Chat'
     const current = {
       id: conversationId,
       title: currentTitle,
-      createdAt: new Date().toISOString(),
+      createdAt: conversationCreatedAt,
       updatedAt: new Date().toISOString(),
       messages: chatMessages,
       isCurrent: true,
     }
 
     const others = archivedConversations
+      .filter((c) => c.id !== conversationId)
       .map((c) => ({ ...c, isCurrent: false }))
 
-    if (!showCurrentConversationInSidebar) return others
+    return [current, ...others]
+  }, [archivedConversations, chatMessages, conversationCreatedAt, conversationId])
 
-    const hasCurrentInArchive = others.some((c) => c.id === conversationId)
-    // Preserve archive order; only append current chat if it is brand new.
-    return hasCurrentInArchive ? others : [...others, current]
-  }, [archivedConversations, chatMessages, conversationId, showCurrentConversationInSidebar])
+  const sidebarHistoryItems = useMemo(() => {
+    return historyConversations.slice(0, 10)
+  }, [historyConversations])
 
   const openEmailFromChatSource = useCallback((emailId) => {
     const id = String(emailId || '').trim()
@@ -214,7 +211,7 @@ export default function AppShell() {
       const archived = {
         id: conversationId,
         title,
-        createdAt: nowIso,
+        createdAt: conversationCreatedAt || nowIso,
         updatedAt: nowIso,
         messages: chatMessages,
       }
@@ -234,7 +231,9 @@ export default function AppShell() {
 
     // Always return to chat view when starting fresh
     setView('chat')
+    const nowIso = new Date().toISOString()
     setConversationId(`conv_${Date.now()}`)
+    setConversationCreatedAt(nowIso)
     setChatMessages([])
     setOpenEmailId('')
     try {
@@ -242,7 +241,7 @@ export default function AppShell() {
     } catch {
       // ignore
     }
-  }, [chatMessages, conversationId])
+  }, [chatMessages, conversationCreatedAt, conversationId])
 
   const resumeConversation = useCallback((id) => {
     const targetId = String(id || '')
@@ -251,6 +250,7 @@ export default function AppShell() {
     if (!convo) return
 
     setConversationId(convo.id || `conv_${Date.now()}`)
+    setConversationCreatedAt(convo.createdAt || new Date().toISOString())
     setChatMessages(Array.isArray(convo.messages) ? convo.messages : [])
     setOpenEmailId('')
     setView('chat')
@@ -279,37 +279,12 @@ export default function AppShell() {
 
         <div className="flex-1 px-3 space-y-1 mt-2">
           <NavItem
-            icon={MessageSquare}
-            label="Admission Chat"
+            icon={Plus}
+            label="New Chat"
             active={view === 'chat'}
-            onClick={() => setView('chat')}
+            onClick={startNewConversation}
             collapsed={!sidebarOpen}
           />
-          {sidebarOpen && sidebarConversations.length > 0 && (
-            <div className="pl-5 pr-2 pb-2 space-y-1">
-              {sidebarConversations.slice(0, 6).map((conv) => (
-                <button
-                  key={conv.id}
-                  type="button"
-                  onClick={() => {
-                    if (conv.id === conversationId) {
-                      setView('chat')
-                      return
-                    }
-                    resumeConversation(conv.id)
-                  }}
-                  className={`w-full text-left text-xs px-2 py-1.5 rounded-md transition-colors truncate ${
-                    view === 'chat' && conversationId === conv.id
-                      ? 'bg-indigo-50 text-indigo-700'
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-                  }`}
-                  title={conv.title || 'Conversation'}
-                >
-                  {conv.title || 'Conversation'}
-                </button>
-              ))}
-            </div>
-          )}
           <NavItem
             icon={Inbox}
             label="Email"
@@ -326,19 +301,58 @@ export default function AppShell() {
             collapsed={!sidebarOpen}
           />
           <NavItem
-            icon={History}
-            label="History"
-            active={view === 'history'}
-            onClick={() => setView('history')}
-            collapsed={!sidebarOpen}
-          />
-          <NavItem
             icon={FlaskConical}
             label="RAG Evaluation"
             active={view === 'evaluation'}
             onClick={() => setView('evaluation')}
             collapsed={!sidebarOpen}
           />
+          <NavItem
+            icon={History}
+            label="History"
+            active={view === 'history'}
+            onClick={() => setView('history')}
+            collapsed={!sidebarOpen}
+          />
+
+          {sidebarOpen && (
+            <div className="mt-2">
+              <div className="h-px bg-slate-200/80 my-2" />
+              <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
+                {sidebarHistoryItems.map((c) => {
+                    const isActive = view === 'history' && historySelectedId === c.id
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setHistorySelectedId(c.id)
+                          setView('history')
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${
+                          isActive
+                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            : 'bg-white text-slate-600 border-transparent hover:bg-slate-50 hover:text-slate-900'
+                        }`}
+                        title={c.title || 'Conversation'}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-xs font-semibold line-clamp-1">{c.title || 'Conversation'}</div>
+                          {c.isCurrent && (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                              Current
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                {sidebarHistoryItems.length === 0 && (
+                  <div className="px-3 py-2 text-xs text-slate-400">No saved chats yet.</div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="p-3 border-t border-slate-100 space-y-1">
@@ -368,17 +382,6 @@ export default function AppShell() {
           </div>
 
           <div className="flex items-center gap-4">
-            {view === 'chat' && (
-              <button
-                type="button"
-                onClick={startNewConversation}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50"
-                title="Start a new conversation"
-              >
-                <Plus size={14} />
-                New Conversation
-              </button>
-            )}
             <div className="flex items-center gap-2 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-md">
               <CheckCircle2 size={12} />
               <span className="text-[10px] font-bold uppercase tracking-wider">Live</span>
@@ -428,8 +431,8 @@ export default function AppShell() {
           {view === 'stats' && <StatsView />}
           {view === 'history' && (
             <HistoryView
-              conversations={archivedConversations}
-              onStartNewConversation={startNewConversation}
+              conversations={historyConversations}
+              selectedConversationId={historySelectedId}
               onResumeConversation={resumeConversation}
               onDeleteConversation={deleteConversation}
             />

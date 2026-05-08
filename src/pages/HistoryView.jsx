@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Bot, History, MessageSquarePlus, Play, Trash2, User } from 'lucide-react'
+import { Bot, History, Play, Trash2, User } from 'lucide-react'
 
 function formatTs(iso) {
   if (!iso) return ''
@@ -12,11 +12,17 @@ function formatTs(iso) {
 
 export default function HistoryView({
   conversations = [],
-  onStartNewConversation,
+  selectedConversationId,
   onResumeConversation,
   onDeleteConversation,
 }) {
   const [selectedId, setSelectedId] = useState('')
+
+  useEffect(() => {
+    const next = String(selectedConversationId || '').trim()
+    if (!next) return
+    setSelectedId(next)
+  }, [selectedConversationId])
 
   const selected = useMemo(() => {
     if (!selectedId) return null
@@ -32,14 +38,6 @@ export default function HistoryView({
             <h1 className="text-2xl font-bold text-slate-900 truncate">Conversation History</h1>
             {conversations.length > 0 && <span className="text-sm text-slate-500">({conversations.length})</span>}
           </div>
-          <button
-            type="button"
-            onClick={() => onStartNewConversation?.()}
-            className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors shrink-0"
-          >
-            <MessageSquarePlus className="w-4 h-4" />
-            New Conversation
-          </button>
         </div>
 
         {conversations.length === 0 ? (
@@ -47,7 +45,7 @@ export default function HistoryView({
             <History className="w-12 h-12 text-slate-300 mx-auto mb-3" />
             <p className="text-slate-700 font-medium">No archived conversations yet.</p>
             <p className="text-sm text-slate-500 mt-1">
-              Start a chat, then click <span className="font-semibold">New Conversation</span> to archive it here.
+              Start chatting. When you want a fresh thread, click <span className="font-semibold">New Chat</span> in the sidebar.
             </p>
           </div>
         ) : (
@@ -155,11 +153,15 @@ export default function HistoryView({
                             {m.role === 'user' ? 'User' : 'Assistant'}
                           </div>
                           {m.role === 'assistant' ? (
-                            <div className="prose prose-sm max-w-none text-slate-800">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content || ''}</ReactMarkdown>
+                            <div className="inline-block max-w-[85%] rounded-2xl rounded-tl-none bg-slate-50 text-slate-900 border border-slate-200 ring-1 ring-inset ring-slate-200/60 px-4 py-3 shadow-sm">
+                              <div className="prose prose-sm max-w-none text-slate-800 break-words">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content || ''}</ReactMarkdown>
+                              </div>
                             </div>
                           ) : (
-                            <p className="text-slate-800 whitespace-pre-wrap break-words">{m.content || ''}</p>
+                            <div className="inline-block max-w-[85%] rounded-2xl rounded-tr-none bg-indigo-600 text-white px-4 py-3 shadow-sm">
+                              <p className="whitespace-pre-wrap break-words">{m.content || ''}</p>
+                            </div>
                           )}
                         </div>
                       </div>

@@ -7,7 +7,6 @@ import {
   Mail,
   Search,
   Inbox,
-  MoreVertical,
   Trash2,
 } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -178,7 +177,8 @@ function OriginalHtmlViewer({ emailId }) {
 function EmailListItem({ email, isSelected, onClick }) {
   const badgeTypes = getEmailBadgeTypes(email, email.displayType)
   const date = email.date || ''
-  const badgeType = badgeTypes[0] || 'other'
+  const visibleBadges = badgeTypes.slice(0, 2)
+  const remainingCount = Math.max(badgeTypes.length - visibleBadges.length, 0)
 
   return (
     <button
@@ -191,12 +191,25 @@ function EmailListItem({ email, isSelected, onClick }) {
       }`}
     >
       <div className="flex justify-between items-center mb-1">
-        <span
-          className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${getBadgeClass(badgeType)}`}
-          title={BADGE_LABELS[badgeType] || badgeType}
-        >
-          {BADGE_LABELS[badgeType] || badgeType}
-        </span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          {visibleBadges.map((t) => (
+            <span
+              key={t}
+              className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${getBadgeClass(t)}`}
+              title={BADGE_LABELS[t] || t}
+            >
+              {BADGE_LABELS[t] || t}
+            </span>
+          ))}
+          {remainingCount > 0 ? (
+            <span
+              className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 ring-1 ring-slate-200"
+              title={badgeTypes.map((t) => BADGE_LABELS[t] || t).join(', ')}
+            >
+              +{remainingCount}
+            </span>
+          ) : null}
+        </div>
         <span className="text-[10px] font-bold text-slate-400">{date}</span>
       </div>
       <h4 className="text-sm font-bold text-slate-800 line-clamp-1 mb-1">
@@ -212,6 +225,266 @@ function EmailListItem({ email, isSelected, onClick }) {
 // --- Reading Pane (reference style) ---
 function EmailDetail({ email, onBack }) {
   const badgeTypes = getEmailBadgeTypes(email, email.displayType)
+  const looksEventishByType = badgeTypes.includes('events') || badgeTypes.includes('workshop')
+
+  const senderDisplay = email?.from || email?.sender || email?.sender_email || email?.senderEmail || ''
+
+  const normalizeWhitespace = (s) => String(s || '').replace(/\s+/g, ' ').trim()
+  const DATEISH_RE =
+    /\b(\d{4}[/-]\d{1,2}[/-]\d{1,2}|\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?|\d{1,2}\s*(?:Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)\.?\s*,?\s*\d{0,4}|(?:Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)\.?\s+\d{1,2}(?:,\s*\d{4})?|\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*[日號]?|\d{1,2}\s*月\s*\d{1,2}\s*[日號]?)\b/i
+  const cleanExtract = (s) => {
+    const str = normalizeWhitespace(s)
+    if (!str) return ''
+    return str
+      .replace(/"\s*,\s*"\w+"\s*:\s*".*?"/gi, '') // strips JSON-ish fragments like `", "event_period": "..."`
+      .replace(/\[[^\]]*\burl\b[^\]]*\]/gi, '') // strips bracket blobs containing url
+      .replace(/\{[^}]*\burl\b[^}]*\}/gi, '') // strips object blobs containing url
+      .replace(/^[“”"'`]+/, '')
+      .replace(/[“”"'`]+$/, '')
+      .replace(/^\s*[:=\-–—]+\s*/, '')
+      .replace(/^\s*"\s*:\s*"?\s*/, '') // handles stray `": "` prefixes from JSON-ish text
+      .replace(/[,\s]*["']?\s*$/, '')
+      .trim()
+  }
+
+  const stripJsonishAndUrls = (s) => {
+    const v = cleanExtract(s)
+    if (!v) return ''
+    return cleanExtract(
+      v
+        // convert literal escaped newlines to spaces
+        .replace(/\\n+/g, ' ')
+        // hard cut if JSON-like tail leaked into requirements
+        .replace(/"\s*(?:links?|link|url|category|event_period|application_deadline|application_link)\s*"\s*:\s*[\s\S]*$/i, '')
+        .replace(/\b(?:links?|url|category)\s*:\s*[\s\S]*$/i, '')
+        // drop obvious dict/list fragments that leak through
+        .replace(/\[[\s\S]*?\]/g, (m) => (/\burl\b|https?:\/\//i.test(m) ? '' : m))
+        .replace(/\{[\s\S]*?\}/g, (m) => (/\burl\b|https?:\/\//i.test(m) ? '' : m))
+        // drop urls from requirements text (they belong in Link row)
+        .replace(/https?:\/\/[^\s)>\]]+/gi, '')
+        .replace(/\s*;\s*(?=;)/g, '; ')
+        .replace(/;{2,}/g, ';')
+        .replace(/\s{2,}/g, ' ')
+        .trim(),
+    )
+  }
+
+  const formatMetaValue = (value) => {
+    if (value === undefined || value === null) return ''
+    if (Array.isArray(value)) {
+      return value
+        .map((v) => formatMetaValue(v))
+        .filter((v) => v && String(v).trim() !== '')
+        .join(', ')
+    }
+    if (typeof value === 'object') {
+      const maybe =
+        value.email ||
+        value.address ||
+        value.value ||
+        value.name ||
+        (typeof value.toString === 'function' && value.toString !== Object.prototype.toString
+          ? value.toString()
+          : '')
+      if (maybe && String(maybe).trim() !== '') return String(maybe)
+      try {
+        return JSON.stringify(value)
+      } catch {
+        return ''
+      }
+    }
+    return String(value)
+  }
+
+  const eventDetailsMeta = useMemo(() => {
+    const text = normalizeWhitespace(
+      [
+        email?.name,
+        email?.subject,
+        email?.introduction,
+        email?.details,
+        typeof email?.content === 'string' ? getEmailContentBodyOnly(decodeHtmlEntities(email.content)) : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    )
+
+    const pickFirst = (...vals) => vals.find((v) => v !== undefined && v !== null && String(v).trim() !== '')
+
+    const firstMatch = (re) => {
+      const m = text.match(re)
+      return m?.[1] ? cleanExtract(m[1]) : ''
+    }
+
+    const firstMatchDateish = (re) => {
+      const v = firstMatch(re)
+      if (!v) return ''
+      return DATEISH_RE.test(v) ? v : ''
+    }
+
+    const firstUrlAnywhere = () => {
+      const m = text.match(/\b(https?:\/\/[^\s)>\]]+)/i)
+      return m?.[1] ? cleanExtract(m[1]) : ''
+    }
+
+    const findUrlNear = (keywordsRe) => {
+      const re = new RegExp(
+        String.raw`(?:${keywordsRe.source})[\s\S]{0,120}?(https?:\/\/[^\s)>\]]+)`,
+        'i',
+      )
+      const m = text.match(re)
+      return m?.[1] ? cleanExtract(m[1].trim()) : ''
+    }
+
+    const fromStructured = {
+      period: pickFirst(
+        email?.event_period,
+        email?.eventPeriod,
+        email?.period,
+        email?.duration,
+        email?.date_range,
+        email?.dateRange,
+      ),
+      deadline: pickFirst(
+        email?.deadline,
+        email?.application_deadline,
+        email?.applicationDeadline,
+        email?.apply_by,
+        email?.applyBy,
+        email?.registration_deadline,
+        email?.registrationDeadline,
+      ),
+      location: pickFirst(email?.location, email?.venue, email?.place),
+      requirements: pickFirst(email?.requirements, email?.eligibility, email?.criteria),
+      link: pickFirst(email?.application_link, email?.applicationLink, email?.registration_link, email?.registrationLink, email?.link),
+      contact: pickFirst(email?.contact, email?.contact_email, email?.contactEmail),
+    }
+
+    const isDeadlineLike = (s) => {
+      const v = cleanExtract(s)
+      if (!v) return false
+      if (/\bdeadline(s)?\b/i.test(v)) return true
+      // lots of comma-separated date items tends to be deadlines list
+      const dateHits = (v.match(/\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\b/g) || []).length
+      return dateHits >= 2
+    }
+
+    const parseDeadlinesList = (raw) => {
+      const v = cleanExtract(raw)
+      if (!v) return []
+      // Remove leading "Various deadlines:" if present
+      const body = v.replace(/^\s*Various deadlines?\s*:\s*/i, '')
+      // Split items like: "28 Apr 2026 (Makeup Workshop), 29 Apr 2026 (...)"
+      const parts = body
+        .split(/,\s*(?=\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\s*\()/)
+        .map((p) => cleanExtract(p))
+        .filter(Boolean)
+      return parts
+    }
+
+    // Heuristic extraction from free text
+    const variousDeadlinesFromText = firstMatch(/\bVarious deadlines?\s*[:\-]\s*([^\n]{10,320})/i)
+
+    const periodFromTextRaw =
+      firstMatch(/\b(?:event|workshop|course)\s*(?:date|dates|time|period|duration)\s*[:\-]\s*([^\n.]{6,160})/i) ||
+      firstMatch(/\b(?:date\s*&\s*time|date\/time)\s*[:\-]\s*([^\n.]{6,160})/i) ||
+      firstMatch(
+        /\b((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\.?\s*)?\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}[^.\n]{0,60}\s*(?:to|\-|–|—)\s*((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\.?\s*)?\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}[^.\n]{0,60}/i,
+      )
+
+    const periodFromText = periodFromTextRaw && /\bdeadline\b/i.test(periodFromTextRaw) ? '' : periodFromTextRaw
+
+    const deadlinesListFromText = parseDeadlinesList(variousDeadlinesFromText)
+
+    const deadlineFromText =
+      (deadlinesListFromText.length ? deadlinesListFromText : '') ||
+      firstMatchDateish(/\b(?:deadline|apply by|application deadline|registration deadline)\s*[:\-]\s*([^\n.]{4,160})/i) ||
+      firstMatchDateish(/\b(?:deadline|apply by|applications? close)\b[^:\n]{0,20}[:\-]?\s*([^\n.]{4,160})/i) ||
+      firstMatchDateish(/\buntil\s+([^\n.]{4,120})/i) ||
+      firstMatchDateish(/\bon\s+or\s+before\s+([^\n.]{4,120})/i) ||
+      firstMatchDateish(/(?:於|至)\s*([^\n]{0,40}?\d{1,2}\s*月\s*\d{1,2}\s*[日號]?[^\n]{0,20}?)\s*(?:截止|前)/i)
+
+    const locationFromText =
+      firstMatch(/\b(?:location|venue|where)\s*[:\-]\s*([^\n.]{3,120})/i)
+
+    const requirementsFromText =
+      firstMatch(/\b(?:requirements?|eligibility|who can apply|criteria)\s*[:\-]\s*([^\n]{6,200})/i) ||
+      (() => {
+        const m = text.match(/\b(?:requirements?|eligibility|criteria)\b\s*[:\-]?\s*([\s\S]{0,400})/i)
+        if (!m?.[1]) return ''
+        const chunk = m[1]
+          .split(/\n{2,}|(?:\bcontact\b|\bregister\b|\bapply\b|\bdeadline\b)/i)[0]
+          .trim()
+        const lines = chunk
+          .split(/\n+/)
+          .map((l) => l.replace(/^[\-\*\u2022]\s+/, '').trim())
+          .filter(Boolean)
+        const joined = lines.length ? lines.slice(0, 6).join('; ') : ''
+        return cleanExtract(joined)
+      })()
+
+    const linkFromText =
+      findUrlNear(/\b(apply|application|register|registration|sign up|signup)\b/) ||
+      firstUrlAnywhere() ||
+      firstMatch(/\b(https?:\/\/[^\s)>\]]+)/i)
+
+    const structuredPeriod = isDeadlineLike(fromStructured.period) ? '' : cleanExtract(fromStructured.period)
+    const structuredDeadline = cleanExtract(fromStructured.deadline)
+    const structuredDeadlineList = parseDeadlinesList(structuredDeadline)
+
+    const linkCandidate = cleanExtract(pickFirst(fromStructured.link, linkFromText))
+    const linkHref = /^https?:\/\//i.test(linkCandidate) ? linkCandidate : cleanExtract(linkFromText || firstUrlAnywhere())
+
+    const rows = [
+      { label: 'Event Period', value: pickFirst(structuredPeriod, periodFromText) },
+      {
+        label: 'Application Deadline',
+        value: pickFirst(
+          structuredDeadlineList.length ? structuredDeadlineList : '',
+          structuredDeadline,
+          deadlineFromText,
+        ),
+      },
+      { label: 'Location', value: cleanExtract(pickFirst(fromStructured.location, locationFromText)) },
+      { label: 'Requirements', value: stripJsonishAndUrls(pickFirst(fromStructured.requirements, requirementsFromText)) },
+      { label: 'Application / Registration Link', value: linkHref ? { href: linkHref } : '' },
+      { label: 'Contact', value: cleanExtract(fromStructured.contact) },
+    ]
+
+    return rows
+      .map((r) => {
+        if (r?.value && typeof r.value === 'object' && r.value.href) {
+          const href = cleanExtract(r.value.href)
+          return { ...r, href, display: href }
+        }
+        const display = formatMetaValue(r.value)
+        return { ...r, display }
+      })
+      .filter((r) => r.display !== undefined && r.display !== null && String(r.display).trim() !== '')
+  }, [email])
+
+  const looksEventishByFields = useMemo(() => {
+    const has = (v) => v !== undefined && v !== null && String(v).trim() !== ''
+    return (
+      has(email?.event_period) ||
+      has(email?.eventPeriod) ||
+      has(email?.application_deadline) ||
+      has(email?.applicationDeadline) ||
+      has(email?.deadline) ||
+      has(email?.location) ||
+      has(email?.venue) ||
+      has(email?.application_link) ||
+      has(email?.applicationLink) ||
+      has(email?.registration_link) ||
+      has(email?.registrationLink) ||
+      has(email?.requirements) ||
+      has(email?.eligibility) ||
+      has(email?.criteria) ||
+      (Array.isArray(eventDetailsMeta) && eventDetailsMeta.length > 0)
+    )
+  }, [email, eventDetailsMeta])
+
+  const showEventDetails = looksEventishByType || looksEventishByFields
 
   return (
     <div className="h-full flex flex-col min-h-0">
@@ -239,7 +512,7 @@ function EmailDetail({ email, onBack }) {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-sm">
-              {email.sender?.[0] || 'S'}
+              {(String(senderDisplay || '').trim()[0] || 'S').toUpperCase()}
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -254,11 +527,7 @@ function EmailDetail({ email, onBack }) {
                 ))}
                 <span className="font-bold text-slate-900">Office</span>
               </div>
-              {email.date && (
-                <p className="text-xs text-slate-500 font-medium">
-                  To: student-portal@sfu.ca
-                </p>
-              )}
+              {email.date && <p className="text-xs text-slate-500 font-medium">{email.date}</p>}
             </div>
           </div>
         </div>
@@ -273,14 +542,51 @@ function EmailDetail({ email, onBack }) {
           {email.details && email.introduction && (
             <p>{email.details}</p>
           )}
-          {badgeTypes.includes('events') || badgeTypes.includes('workshop') ? (
+          {showEventDetails ? (
             <div className="my-8 p-6 bg-slate-50 rounded-xl border border-dashed border-slate-300">
               <h5 className="text-xs font-bold text-slate-800 mb-3 uppercase tracking-widest">
                 Event Details
               </h5>
-              <p className="text-slate-600">
-                Join us for this upcoming event. Check the original email for location and time.
-              </p>
+              {eventDetailsMeta.length > 0 ? (
+                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-slate-700 not-prose">
+                  {eventDetailsMeta.map((row) => (
+                    <div key={row.label} className="min-w-0">
+                      <dt className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        {row.label}
+                      </dt>
+                      <dd className="text-sm font-medium text-slate-800 break-words">
+                        {Array.isArray(row.value) ? (
+                          <ul className="list-disc pl-5 space-y-1">
+                            {row.value.slice(0, 8).map((item, idx) => (
+                              <li key={idx}>{String(item)}</li>
+                            ))}
+                            {row.value.length > 8 ? (
+                              <li className="text-slate-500">
+                                +{row.value.length - 8} more…
+                              </li>
+                            ) : null}
+                          </ul>
+                        ) : row.href ? (
+                          <a
+                            href={row.href}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-indigo-600 hover:text-indigo-700 underline underline-offset-2 break-all"
+                          >
+                            {row.display}
+                          </a>
+                        ) : (
+                          row.display
+                        )}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : (
+                <p className="text-slate-600 not-prose">
+                  Check the original email for location and time.
+                </p>
+              )}
             </div>
           ) : null}
         </div>
@@ -349,57 +655,59 @@ export default function EmailsPage({ embedded = false, selectedId: selectedIdPro
     load()
   }, [])
 
-  const mergedList = useMemo(() => {
-    let list = []
-    if (activeTab === 'all') {
-      const unique = new Map()
-      Object.entries(emails).forEach(([type, listPart]) => {
-        listPart.forEach((email) => {
-          const key = getEmailIdentity(email)
-          const existing = unique.get(key)
-          const displayType = getEmailBadgeTypes(email, type)[0]
-          if (!existing) {
-            unique.set(key, { ...email, displayType })
-            return
-          }
-          unique.set(key, {
-            ...existing,
-            ...email,
-            displayType: existing.displayType,
-            types: normalizeEmailTypes([
-              ...(Array.isArray(existing.types) ? existing.types : []),
-              ...(Array.isArray(email.types) ? email.types : []),
-              existing.type,
-              email.type,
-              existing.displayType,
-              displayType,
-            ]),
-          })
+  const allMergedList = useMemo(() => {
+    const unique = new Map()
+    Object.entries(emails).forEach(([type, listPart]) => {
+      listPart.forEach((email) => {
+        const key = getEmailIdentity(email)
+        const existing = unique.get(key)
+        const displayType = getEmailBadgeTypes(email, type)[0]
+        if (!existing) {
+          unique.set(key, { ...email, displayType })
+          return
+        }
+        unique.set(key, {
+          ...existing,
+          ...email,
+          displayType: existing.displayType,
+          types: normalizeEmailTypes([
+            ...(Array.isArray(existing.types) ? existing.types : []),
+            ...(Array.isArray(email.types) ? email.types : []),
+            existing.type,
+            email.type,
+            existing.displayType,
+            displayType,
+          ]),
         })
       })
-      list = Array.from(unique.values())
-    } else {
-      list = (emails[activeTab] || []).map((e) => ({ ...e, displayType: activeTab }))
-    }
-    return list.sort((a, b) => getEmailSortTimestamp(b) - getEmailSortTimestamp(a))
-  }, [emails, activeTab])
+    })
+    return Array.from(unique.values()).sort((a, b) => getEmailSortTimestamp(b) - getEmailSortTimestamp(a))
+  }, [emails])
+
+  const visibleList = useMemo(() => {
+    if (activeTab === 'all') return allMergedList
+    return allMergedList.filter((e) => getEmailBadgeTypes(e, e.displayType).includes(activeTab))
+  }, [allMergedList, activeTab])
 
   useEffect(() => {
     if (!embedded) return
     if (!selectedIdProp) return
-    const exists = mergedList.some(
+    // Wait for inbox data to load before validating the selection;
+    // otherwise we clear the selection on initial empty mergedList.
+    if (loading || error) return
+    const exists = allMergedList.some(
       (e) =>
         e.email_id === selectedIdProp ||
         e.source_id === selectedIdProp ||
         getEmailIdentity(e) === selectedIdProp,
     )
     if (!exists) onSelectEmail?.('')
-  }, [embedded, selectedIdProp, mergedList, onSelectEmail])
+  }, [embedded, selectedIdProp, allMergedList, onSelectEmail, loading, error])
 
   const filteredList = useMemo(() => {
     const query = q.trim().toLowerCase()
-    if (!query) return mergedList
-    return mergedList.filter((e) => {
+    if (!query) return visibleList
+    return visibleList.filter((e) => {
       const hay = [
         e.name,
         e.subject,
@@ -415,15 +723,15 @@ export default function EmailsPage({ embedded = false, selectedId: selectedIdPro
         .toLowerCase()
       return hay.includes(query)
     })
-  }, [mergedList, q])
+  }, [visibleList, q])
 
   const selectedEmail = useMemo(() => {
     if (!selectedId) return null
-    const found = mergedList.find(
+    const found = allMergedList.find(
       (e) => e.email_id === selectedId || e.source_id === selectedId || getEmailIdentity(e) === selectedId,
     )
     return found || null
-  }, [mergedList, selectedId])
+  }, [allMergedList, selectedId])
 
   useEffect(() => {
     if (embedded) return
