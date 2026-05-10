@@ -202,9 +202,11 @@ export default function AppShell() {
     setRbsUsername('')
   }, [rbsLoggedIn])
 
-  const startNewConversation = useCallback(async () => {
-    const hasAnything = Array.isArray(chatMessages) && chatMessages.length > 0
-    if (hasAnything) {
+  /** Merge the in-memory active thread into the archived list (same rules as “New Chat”). */
+  const mergeCurrentIntoArchivedList = useCallback(
+    (prevArchived) => {
+      const hasAnything = Array.isArray(chatMessages) && chatMessages.length > 0
+      if (!hasAnything) return prevArchived
       const firstUser = chatMessages.find((m) => m.role === 'user')?.content || 'Conversation'
       const title = String(firstUser).slice(0, 60) || 'Conversation'
       const nowIso = new Date().toISOString()
@@ -215,19 +217,22 @@ export default function AppShell() {
         updatedAt: nowIso,
         messages: chatMessages,
       }
-      setArchivedConversations((prev) => {
-        const existing = prev.find((c) => c.id === conversationId)
-        const merged = existing
-          ? {
-              ...existing,
-              ...archived,
-              createdAt: existing.createdAt || archived.createdAt,
-              updatedAt: nowIso,
-            }
-          : archived
-        return [merged, ...prev.filter((c) => c.id !== conversationId)].slice(0, 200)
-      })
-    }
+      const existing = prevArchived.find((c) => c.id === conversationId)
+      const merged = existing
+        ? {
+            ...existing,
+            ...archived,
+            createdAt: existing.createdAt || archived.createdAt,
+            updatedAt: nowIso,
+          }
+        : archived
+      return [merged, ...prevArchived.filter((c) => c.id !== conversationId)].slice(0, 200)
+    },
+    [chatMessages, conversationCreatedAt, conversationId]
+  )
+
+  const startNewConversation = useCallback(async () => {
+    setArchivedConversations((prev) => mergeCurrentIntoArchivedList(prev))
 
     // Always return to chat view when starting fresh
     setView('chat')
@@ -241,21 +246,41 @@ export default function AppShell() {
     } catch {
       // ignore
     }
-  }, [chatMessages, conversationCreatedAt, conversationId])
+  }, [mergeCurrentIntoArchivedList])
 
-  const resumeConversation = useCallback((id) => {
-    const targetId = String(id || '')
-    if (!targetId) return
-    const convo = archivedConversations.find((c) => c.id === targetId)
-    if (!convo) return
+  const resumeConversation = useCallback(
+    (id) => {
+      const targetId = String(id || '')
+      if (!targetId) return
 
-    setConversationId(convo.id || `conv_${Date.now()}`)
-    setConversationCreatedAt(convo.createdAt || new Date().toISOString())
-    setChatMessages(Array.isArray(convo.messages) ? convo.messages : [])
-    setOpenEmailId('')
-    setView('chat')
+      if (targetId === conversationId) {
+        setOpenEmailId('')
+        setView('chat')
+        return
+      }
 
-  }, [archivedConversations])
+      let nextArchived = mergeCurrentIntoArchivedList(archivedConversations)
+      let convo = nextArchived.find((c) => c.id === targetId)
+      // Cap slice can drop the tail; ensure resume target is never evicted from persistence.
+      if (!convo) {
+        convo = archivedConversations.find((c) => c.id === targetId)
+      }
+      if (!convo) return
+      if (!nextArchived.some((c) => c.id === targetId)) {
+        nextArchived = [convo, ...nextArchived.filter((c) => c.id !== targetId)].slice(0, 200)
+      }
+      if (nextArchived !== archivedConversations) {
+        setArchivedConversations(nextArchived)
+      }
+
+      setConversationId(convo.id || `conv_${Date.now()}`)
+      setConversationCreatedAt(convo.createdAt || new Date().toISOString())
+      setChatMessages(Array.isArray(convo.messages) ? convo.messages : [])
+      setOpenEmailId('')
+      setView('chat')
+    },
+    [archivedConversations, conversationId, mergeCurrentIntoArchivedList]
+  )
 
   const deleteConversation = useCallback((id) => {
     const targetId = String(id || '')
@@ -311,7 +336,10 @@ export default function AppShell() {
             icon={History}
             label="History"
             active={view === 'history'}
-            onClick={() => setView('history')}
+            onClick={() => {
+              setHistorySelectedId('')
+              setView('history')
+            }}
             collapsed={!sidebarOpen}
           />
 
@@ -320,14 +348,17 @@ export default function AppShell() {
               <div className="h-px bg-slate-200/80 my-2" />
               <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
                 {sidebarHistoryItems.map((c) => {
-                    const isActive = view === 'history' && historySelectedId === c.id
+                    const isActive = c.isCurrent && view === 'chat'
                     return (
                       <button
                         key={c.id}
                         type="button"
                         onClick={() => {
-                          setHistorySelectedId(c.id)
-                          setView('history')
+                          if (c.isCurrent) {
+                            setView('chat')
+                            return
+                          }
+                          resumeConversation(c.id)
                         }}
                         className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${
                           isActive

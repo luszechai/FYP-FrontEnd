@@ -19,9 +19,7 @@ export default function HistoryView({
   const [selectedId, setSelectedId] = useState('')
 
   useEffect(() => {
-    const next = String(selectedConversationId || '').trim()
-    if (!next) return
-    setSelectedId(next)
+    setSelectedId(String(selectedConversationId || '').trim())
   }, [selectedConversationId])
 
   const selected = useMemo(() => {
